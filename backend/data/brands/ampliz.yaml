@@ -1,0 +1,31 @@
+slug: ampliz
+name: Ampliz
+tagline: Data To Power Your Business
+logo_url: /brands/ampliz/logo.svg
+
+tokens:
+  brand_accent: "#0071EB"
+  brand_accent_soft: "#E6F0FD"
+  brand_ink: "#000000"
+  brand_muted: "#6B7280"
+  brand_rule: "#D1D5DB"
+  brand_bg: "#FFFFFF"
+  font_primary: "Roboto"
+  font_secondary: "Roboto"
+  font_google_url: "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"
+
+sender_default:
+  company: Ampliz
+  offer: >-
+    B2B and Healthcare Data Intelligence powered by Contextual Intelligence —
+    120M+ contacts, 4M+ verified physicians, ISO 27001-certified.
+
+system_prompt_addendum: |
+  Write in Ampliz's voice: authoritative on data accuracy, accessible and
+  empowering, with healthcare-aware framing when the prospect is in HCP/payer/provider
+  space. Frame Ampliz as an "intelligence platform," never a "data vendor" or
+  "email list provider." Cite specific numbers (99% accuracy, 4M+ physicians).
+
+voice_keywords: [contextual intelligence, accuracy, healthcare, HCP, ISO 27001]
+
+default_model: anthropic/claude-sonnet-4.5

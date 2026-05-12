@@ -1,0 +1,29 @@
+# Fallback brand — used when a slug has no specific config.
+# Matches the neutral charcoal palette from the white-label HTML cheat sheet.
+
+slug: default
+name: Default
+tagline: Five Levels of Email Personalization
+logo_url: null
+
+tokens:
+  brand_accent: "#1A1A1A"
+  brand_accent_soft: "#F5F5F5"
+  brand_ink: "#0A0A0A"
+  brand_muted: "#5C5C66"
+  brand_rule: "#E5E5E8"
+  brand_bg: "#FFFFFF"
+  font_primary: "Inter"
+  font_secondary: "Inter"
+  font_google_url: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+
+sender_default:
+  company: Your Company
+  offer: >-
+    Briefly describe what you offer — one or two plain-prose sentences.
+
+system_prompt_addendum: ""
+
+voice_keywords: []
+
+default_model: anthropic/claude-sonnet-4.5

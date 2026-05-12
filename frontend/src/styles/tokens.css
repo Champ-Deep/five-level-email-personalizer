@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-accent: #1A1A1A;
+  --brand-accent-soft: #F5F5F5;
+  --brand-ink: #0A0A0A;
+  --brand-muted: #5C5C66;
+  --brand-rule: #E5E5E8;
+  --brand-bg: #FFFFFF;
+  --brand-font-primary: "Inter", system-ui, sans-serif;
+  --brand-font-secondary: "Inter", serif;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--brand-bg);
+  color: var(--brand-ink);
+  font-family: var(--brand-font-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}

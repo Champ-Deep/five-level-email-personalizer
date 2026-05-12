@@ -1,0 +1,33 @@
+# PLACEHOLDER — SPAN Global Services has no dedicated brand-guideline skill on disk.
+# Using Champions Group fallback palette until official assets are provided.
+# TODO: replace tokens, logo_url, tagline, and sender_default with SPAN's real brand.
+
+slug: span-global
+name: SPAN Global Services
+tagline: Data-Driven Growth at Global Scale
+logo_url: /brands/span-global/logo.svg
+
+tokens:
+  brand_accent: "#0F4C81"
+  brand_accent_soft: "#E3EEF7"
+  brand_ink: "#1A1A1A"
+  brand_muted: "#5C5C66"
+  brand_rule: "#E5E5E8"
+  brand_bg: "#FFFFFF"
+  font_primary: "Inter"
+  font_secondary: "Inter"
+  font_google_url: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+
+sender_default:
+  company: SPAN Global Services
+  offer: >-
+    Full-stack B2B demand generation and database services — helping enterprise
+    revenue teams find, reach, and engage their global ideal-customer profile.
+
+system_prompt_addendum: |
+  Write in SPAN Global Services' voice: enterprise-grade, global, authoritative
+  on B2B database and demand generation. Substance over flash.
+
+voice_keywords: [global, enterprise, demand generation, database services]
+
+default_model: anthropic/claude-sonnet-4.5

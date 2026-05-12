@@ -1,0 +1,20 @@
+[project]
+name = "champ-personalize"
+version = "0.1.0"
+description = "Python SDK for the Champions Group Five-Level Email Personalizer"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28",
+  "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+local = ["champ-personalize-backend"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["champ_personalize*"]

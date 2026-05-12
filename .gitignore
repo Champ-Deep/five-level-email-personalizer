@@ -1,0 +1,40 @@
+# env
+.env
+.env.local
+.env.*.local
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.log
+
+# node
+node_modules/
+dist/
+.vite/
+.next/
+*.tsbuildinfo
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# runtime
+uploads/
+data/runtime/
+*.db
+*.sqlite
+
+# build
+build/
+out/

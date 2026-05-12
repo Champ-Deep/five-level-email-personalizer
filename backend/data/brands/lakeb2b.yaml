@@ -1,0 +1,29 @@
+slug: lakeb2b
+name: LakeB2B
+tagline: ENABLING GROWTH
+logo_url: /brands/lakeb2b/logo.svg
+
+tokens:
+  brand_accent: "#6D08BE"
+  brand_accent_soft: "#F4E8FB"
+  brand_ink: "#0A0A0A"
+  brand_muted: "#5C5C66"
+  brand_rule: "#E5E5E8"
+  brand_bg: "#FFFFFF"
+  font_primary: "Montserrat"
+  font_secondary: "Alata"
+  font_google_url: "https://fonts.googleapis.com/css2?family=Alata&family=Montserrat:wght@300;400;600;700;800&display=swap"
+
+sender_default:
+  company: LakeB2B
+  offer: >-
+    B2B data intelligence and demand generation — helping revenue teams find,
+    reach, and convert their ideal buyers faster.
+
+system_prompt_addendum: |
+  Write in LakeB2B's voice: authoritative on data quality, focused on enabling
+  revenue-team growth, never sounding like a list vendor. Substantive over flashy.
+
+voice_keywords: [enabling, growth, data intelligence, demand generation]
+
+default_model: anthropic/claude-sonnet-4.5

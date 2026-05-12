@@ -1,0 +1,33 @@
+slug: champions-group
+name: Champions Group
+tagline: Empowering Innovation. Building Resilience.
+logo_url: /brands/champions-group/logo.svg
+
+tokens:
+  brand_accent: "#C9A84C"
+  brand_accent_soft: "#F5E6B8"
+  brand_ink: "#2D2D2D"
+  brand_muted: "#666666"
+  brand_rule: "#D0D5DD"
+  brand_bg: "#FAF8F2"
+  font_primary: "Calibri"
+  font_secondary: "Inter"
+  font_google_url: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+
+sender_default:
+  company: Champions Group
+  offer: >-
+    A multi-venture innovation group spanning B2B data intelligence, technology,
+    and growth services — partnering with founders and revenue leaders to build
+    resilient, compounding businesses.
+
+system_prompt_addendum: |
+  Write in Champions Group's voice: premium, authoritative, visionary. Think in
+  ecosystems and outcomes, never silos or features. Frame Champions Group as a
+  "multi-venture innovation group" — never "holding company," "conglomerate," or
+  "investment firm." Cite concrete scale (12 companies, 120M+ contacts, 4M+ physicians)
+  when relevant.
+
+voice_keywords: [innovation, resilience, ecosystem, premium, multi-venture]
+
+default_model: anthropic/claude-sonnet-4.5

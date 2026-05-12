@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: personalizer
+      POSTGRES_PASSWORD: personalizer
+      POSTGRES_DB: personalizer
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U personalizer"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://personalizer:personalizer@postgres:5432/personalizer
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_BASE_URL: http://localhost:5173
+      APP_BASE_URL: http://localhost:8000
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-anthropic/claude-sonnet-4.5}
+      OPENROUTER_RESEARCH_MODEL: ${OPENROUTER_RESEARCH_MODEL:-perplexity/sonar-pro}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+      DEFAULT_BRAND: ${DEFAULT_BRAND:-lakeb2b}
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://personalizer:personalizer@postgres:5432/personalizer
+      REDIS_URL: redis://redis:6379/0
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-anthropic/claude-sonnet-4.5}
+      OPENROUTER_RESEARCH_MODEL: ${OPENROUTER_RESEARCH_MODEL:-perplexity/sonar-pro}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+    command: arq app.workers.arq_worker.WorkerSettings
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports: ["5173:5173"]
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
