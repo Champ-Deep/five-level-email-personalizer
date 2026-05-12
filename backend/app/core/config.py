@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Brands
     default_brand: str = "lakeb2b"
     brands_dir: str = "data/brands"
+    # When set, the backend ignores Host / query / header and always serves
+    # this brand. Used on per-brand deploys (e.g. the `lakeb2b` and
+    # `span-global` git branches set this in their .env.example).
+    locked_brand: str = ""
 
     # Personalizer
     max_concurrent_levels: int = Field(default=8, description="asyncio semaphore for OpenRouter fan-out")

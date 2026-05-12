@@ -1,33 +1,47 @@
-# PLACEHOLDER — SPAN Global Services has no dedicated brand-guideline skill on disk.
-# Using Champions Group fallback palette until official assets are provided.
-# TODO: replace tokens, logo_url, tagline, and sender_default with SPAN's real brand.
-
 slug: span-global
 name: SPAN Global Services
-tagline: Data-Driven Growth at Global Scale
+tagline: Marketing Data Intelligence to Fuel Growth
 logo_url: /brands/span-global/logo.svg
 
+# Source: ~/Celsus/Atlas/Context Docs/SPAN Global Services/Brand Guidelines.md
+# Identity (April 2026): classic green and white — Authority, data intelligence, trust.
+# 25M+ verified business contacts. Founded 2002. HQ Henderson, NV.
+# Note: Montserrat is shared with Lake B2B for Champions Group cohesion.
+
 tokens:
-  brand_accent: "#0F4C81"
-  brand_accent_soft: "#E3EEF7"
-  brand_ink: "#1A1A1A"
-  brand_muted: "#5C5C66"
-  brand_rule: "#E5E5E8"
-  brand_bg: "#FFFFFF"
-  font_primary: "Inter"
-  font_secondary: "Inter"
-  font_google_url: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+  brand_accent: "#1B6B3A"          # SPAN Green
+  brand_accent_soft: "#E8F5ED"     # Span Mint
+  brand_ink: "#1A2E23"             # Forest Ink
+  brand_muted: "#4A6B57"           # Sage
+  brand_rule: "#D4E5DA"            # Border Green
+  brand_bg: "#F8FBF9"              # Warm Gray (barely green-tinted white)
+  font_primary: "Inter"            # body
+  font_secondary: "Montserrat"     # headings
+  font_google_url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap"
 
 sender_default:
   company: SPAN Global Services
   offer: >-
-    Full-stack B2B demand generation and database services — helping enterprise
-    revenue teams find, reach, and engage their global ideal-customer profile.
+    Marketing data intelligence to fuel growth — 25M+ verified business contacts
+    across pharma, legal, energy, market research, and education, helping enterprise
+    revenue teams reach the right people at the right time with the right message.
 
 system_prompt_addendum: |
-  Write in SPAN Global Services' voice: enterprise-grade, global, authoritative
-  on B2B database and demand generation. Substance over flash.
+  Write in SPAN Global Services' voice: authoritative, precise, growth-oriented, global.
+  Lead with the insight, follow with the proof. Data-confident without being jargon-heavy.
+  Focus on outcomes and ROI, not features. Active voice, strong verbs.
+  Frame SPAN as a "data intelligence" partner — never "data vendor" or "list provider."
+  When relevant, cite concrete scale (25M+ verified contacts, founded 2002, global reach
+  across industries and geographies). Messaging pillars: Data Intelligence,
+  Precision Targeting, Measurable Growth, Global Scale.
 
-voice_keywords: [global, enterprise, demand generation, database services]
+voice_keywords:
+  - data intelligence
+  - precision targeting
+  - measurable growth
+  - global scale
+  - verified
+  - authority
+  - 25M+ contacts
 
 default_model: anthropic/claude-sonnet-4.6
