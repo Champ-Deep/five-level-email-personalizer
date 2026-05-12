@@ -110,6 +110,7 @@ export function InternalAppRoute() {
   if (!activeBrand) return <InternalLayout title="Batch personalize"><div>Loading…</div></InternalLayout>;
 
   return (
+<<<<<<< HEAD
     <InternalLayout
       title="Batch personalize"
       subtitle={`Upload a CSV with columns "name, title, domain, linkedin". Three model variations per row.`}
@@ -144,6 +145,16 @@ export function InternalAppRoute() {
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--brand-muted)" }}>
               Job {jobId?.slice(0, 8)}
             </h2>
+=======
+    <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
+      <BrandHeader
+        brand={activeBrand}
+        rightSlot={
+          <div className="flex items-center gap-3">
+            <Link to={`/lead-magnet/${activeBrand.slug}`} className="text-xs" style={{ color: "var(--brand-muted)" }}>
+              View lead-magnet
+            </Link>
+>>>>>>> ee0bb66 (LakeB2B branded build · brand-locked to lakeb2b)
             <button
               onClick={exportCsv}
               disabled={job.done === 0}
