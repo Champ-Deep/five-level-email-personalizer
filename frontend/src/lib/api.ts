@@ -76,9 +76,18 @@ export interface EmailDraft {
   warnings: string[];
 }
 
+export interface Variation {
+  slot: string;
+  label: string;
+  model: string;
+  email: EmailDraft;
+}
+
 export interface PersonalizeResponse {
   brand: string;
   brief: Brief;
+  variations: Variation[];
+  /** kept for back-compat — usually `{ 5: <A-slot email> }` */
   emails: Record<string, EmailDraft>;
 }
 

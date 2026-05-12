@@ -19,6 +19,8 @@ from app.levels.schemas import (
     PersonalizeResponse,
     ProspectInput,
     SenderInput,
+    Variation,
+    VariationSpec,
 )
 from app.services.brand_service import BrandConfig
 from app.services.llm.base import LLMError, LLMProvider
@@ -99,7 +101,7 @@ async def _generate_one(
         raw = await provider.chat(
             [{"role": "user", "content": prompt}],
             model=model,
-            max_tokens=900,
+            max_tokens=3000,
             temperature=0.7,
             system=composed_system,
         )
@@ -142,7 +144,7 @@ async def _retry_strict(
                     {"role": "user", "content": correction},
                 ],
                 model=model,
-                max_tokens=900,
+                max_tokens=3000,
                 temperature=0.4,
                 system=composed_system,
             )
@@ -164,13 +166,22 @@ async def _retry_strict(
     return draft
 
 
+def _resolve_variations(request: PersonalizeRequest, brand: BrandConfig) -> list[VariationSpec]:
+    if request.variations:
+        return list(request.variations)
+    # Legacy single-model path: respect request.model > brand.default_model.
+    if request.model:
+        return [VariationSpec(slot="A", model=request.model, label=request.model)]
+    settings = get_settings()
+    return [VariationSpec(**spec) for spec in settings.default_variation_specs]
+
+
 async def personalize(
     request: PersonalizeRequest,
     brand: BrandConfig,
     provider: LLMProvider,
 ) -> PersonalizeResponse:
     settings = get_settings()
-    model = request.model or brand.default_model
 
     sender = request.sender or SenderInput(
         name=brand.sender_default.name or brand.name,
@@ -180,38 +191,50 @@ async def personalize(
 
     brief = await research_prospect(request.prospect, provider, brand_addendum=brand.system_prompt_addendum)
 
+    # Determine which level to generate per variation. The fused 5-layer email
+    # is level 5; we keep `levels` in the schema for backwards compat but for
+    # the variation pipeline we always run level 5 and replicate it per slot.
+    primary_level = max(request.levels) if request.levels else 5
+    specs = _resolve_variations(request, brand)
+
     semaphore = asyncio.Semaphore(settings.max_concurrent_levels)
     tasks = [
         _generate_one(
-            level=lvl,
+            level=primary_level,
             brief=brief,
             sender=sender,
             prospect_title=request.prospect.title,
             provider=provider,
-            model=model,
+            model=spec.model,
             brand=brand,
             system_override=request.system_prompt_override,
             style_rules=request.style_rules,
             semaphore=semaphore,
         )
-        for lvl in request.levels
+        for spec in specs
     ]
     drafts = await asyncio.gather(*tasks, return_exceptions=True)
 
-    emails: dict[int, EmailDraft] = {}
-    for lvl, result in zip(request.levels, drafts):
+    variations: list[Variation] = []
+    for spec, result in zip(specs, drafts):
         if isinstance(result, EmailDraft):
-            emails[lvl] = result
+            draft = result
         else:
-            emails[lvl] = EmailDraft(
-                subject=f"[Level {lvl} generation failed]",
+            draft = EmailDraft(
+                subject=f"[Variation {spec.slot} ({spec.model}) failed]",
                 body=str(result),
                 word_count=0,
                 anchor_signal="",
                 warnings=[f"generation_error: {type(result).__name__}"],
             )
+        variations.append(Variation(slot=spec.slot, label=spec.label or spec.model, model=spec.model, email=draft))
 
-    return PersonalizeResponse(brand=brand.slug, brief=brief, emails=emails)
+    # Back-compat: surface variation A under `emails[level]` for single-model callers.
+    emails: dict[int, EmailDraft] = {}
+    if variations:
+        emails[primary_level] = variations[0].email
+
+    return PersonalizeResponse(brand=brand.slug, brief=brief, variations=variations, emails=emails)
 
 
 async def personalize_one(

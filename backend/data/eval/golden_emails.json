@@ -10,6 +10,7 @@
   "cases": [
     {
       "id": "patrick-sherwin-gosun",
+      "segment": "Hardware/DTC founder",
       "prospect": {
         "name": "Patrick Sherwin",
         "title": "Founder",
@@ -25,6 +26,63 @@
         "url": "https://claude.ai/public/artifacts/ef1d4c47-d8fd-4f8c-a2ce-a2de787e8b43",
         "subject": "GoSun's next growth phase and buyer reach",
         "body": "Patrick,\n\nExpanding a solar product line across outdoor, off-grid, and emergency prep markets simultaneously is a serious coordination challenge — especially when component costs shift and logistics windows narrow without warning. What often gets squeezed in that environment is the demand side: finding and reaching the right buyers before momentum slows.\n\nAt LakeB2B, we help hardware-focused companies like GoSun identify and connect with verified buyers across their exact target segments — so your sales motion keeps pace with your product roadmap rather than trailing it.\n\nWorth a quick look?\n\nBest,\nDeep"
+      }
+    },
+    {
+      "id": "brian-halligan-hubspot",
+      "segment": "Mature SaaS executive chairman",
+      "prospect": {
+        "name": "Brian Halligan",
+        "title": "Executive Chairman",
+        "domain": "hubspot.com"
+      },
+      "sender": {
+        "name": "Deep",
+        "company": "LakeB2B",
+        "offer": "B2B data intelligence and demand generation — helping revenue teams find, reach, and convert their ideal buyers faster."
+      },
+      "baseline": {
+        "source": "chief_replica.py via OpenRouter (anthropic/claude-sonnet-4.5), regenerated",
+        "subject": "AEO launch and the data behind it",
+        "body": "Brian,\n\nHubSpot AEO arriving in April feels like the natural evolution of inbound for the AI era. As you shape partner strategy and long-term vision from the Executive Chairman seat, I imagine one tension keeps surfacing: ensuring your product bets are fed by intelligence sharp enough to match the ambition of 215,000 customers across 135 countries.\n\nWe help B2B revenue teams at scale find and convert ideal buyers faster with data intelligence that actually reflects how markets move today, not last quarter.\n\nWorth a quick look?\n\nBest,\nDeep"
+      }
+    },
+    {
+      "id": "toby-lutke-shopify",
+      "segment": "Public-company founder/CEO",
+      "prospect": {
+        "name": "Toby Lütke",
+        "title": "CEO",
+        "domain": "shopify.com"
+      },
+      "sender": {
+        "name": "Deep",
+        "company": "LakeB2B",
+        "offer": "B2B data intelligence and demand generation — helping revenue teams find, reach, and convert their ideal buyers faster."
+      },
+      "baseline": {
+        "source": "chief_replica.py via OpenRouter (anthropic/claude-sonnet-4.5), regenerated",
+        "subject": "Ten quarters of FCF discipline meets AI scale",
+        "body": "Toby,\n\nTen consecutive quarters of double-digit free cash flow margins while growing 31% YoY is rare discipline. Even rarer is embedding AI as a performance expectation across the entire org, not just product.\n\nThe tension I'm seeing with platform CEOs right now: proving AI investment translates to durable revenue growth without spooking investors conditioned to software multiples, not AI speculation.\n\nWe help revenue teams at companies scaling AI-native products identify and reach buyers who actually have budget allocated for transformation, not tire-kickers chasing demos.\n\nWorth a quick look?\n\nBest,\nDeep"
+      }
+    },
+    {
+      "id": "wade-foster-zapier",
+      "segment": "Bootstrapped SaaS founder/CEO",
+      "prospect": {
+        "name": "Wade Foster",
+        "title": "CEO",
+        "domain": "zapier.com"
+      },
+      "sender": {
+        "name": "Deep",
+        "company": "LakeB2B",
+        "offer": "B2B data intelligence and demand generation — helping revenue teams find, reach, and convert their ideal buyers faster."
+      },
+      "baseline": {
+        "source": "chief_replica.py via OpenRouter (anthropic/claude-sonnet-4.5), regenerated",
+        "subject": "800 AI agents, one cultural tightrope",
+        "body": "Wade,\n\nYou now have more AI agents at Zapier than human employees—800+ and climbing. That March 2023 code red after GPT-4 dropped was bold: shutting down for a week-long hackathon that took AI adoption from 10% to 50% overnight.\n\nBut speed like that creates tension. People need time to adapt, and retention becomes fragile when transformation outpaces comfort.\n\nWe help revenue leaders moving this fast identify which prospects actually understand what you're building—so your team spends energy on believers, not skeptics still figuring out what AI even means.\n\nWorth a quick look?\n\nBest,\nDeep"
       }
     }
   ]

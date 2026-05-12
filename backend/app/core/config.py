@@ -16,9 +16,19 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout: int = 120
-    openrouter_default_model: str = "anthropic/claude-sonnet-4.5"
+    openrouter_default_model: str = "anthropic/claude-sonnet-4.6"
     openrouter_research_model: str = "perplexity/sonar-pro"
     anthropic_api_key: str = ""
+
+    # Three model slots for the variation pipeline. Each generates a full
+    # 5-layer-fused email; the UI shows all 3 side-by-side so the user picks.
+    # Override per environment via .env.
+    variation_a_model: str = "anthropic/claude-sonnet-4.6"
+    variation_a_label: str = "Claude Sonnet 4.6"
+    variation_b_model: str = "deepseek/deepseek-v4-pro"
+    variation_b_label: str = "DeepSeek V4 Pro"
+    variation_c_model: str = "openai/gpt-4o"
+    variation_c_label: str = "GPT-4o"
 
     # Storage
     database_url: str = "postgresql+asyncpg://personalizer:personalizer@localhost:5432/personalizer"
@@ -49,6 +59,14 @@ class Settings(BaseSettings):
         if not path.is_absolute():
             path = Path(__file__).resolve().parents[2] / path
         return path
+
+    @property
+    def default_variation_specs(self) -> list[dict]:
+        return [
+            {"slot": "A", "model": self.variation_a_model, "label": self.variation_a_label},
+            {"slot": "B", "model": self.variation_b_model, "label": self.variation_b_label},
+            {"slot": "C", "model": self.variation_c_model, "label": self.variation_c_label},
+        ]
 
 
 @lru_cache

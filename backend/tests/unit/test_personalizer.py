@@ -61,7 +61,7 @@ def test_validate_flags_banned_words():
 
 
 @pytest.mark.asyncio
-async def test_personalize_happy_path_runs_all_levels():
+async def test_personalize_runs_variations_in_parallel():
     research = {
         "name": "Priya Sharma",
         "title": "VP Sales",
@@ -88,16 +88,27 @@ async def test_personalize_happy_path_runs_all_levels():
         "anchor_signal": "Recent Acme acquisition",
     }
 
+    from app.levels.schemas import VariationSpec
+
     brand = load_brand("lakeb2b")
     provider = MockProvider(research, email)
     request = PersonalizeRequest(
         prospect=ProspectInput(name="Priya Sharma", title="VP Sales", domain="stripe.com"),
         sender=SenderInput(name="Subhakar", company="LakeB2B", offer="B2B data intelligence"),
-        levels=[1, 2, 3, 4, 5],
+        levels=[5],
+        variations=[
+            VariationSpec(slot="A", model="anthropic/claude-sonnet-4.6", label="Sonnet 4.6"),
+            VariationSpec(slot="B", model="deepseek/deepseek-v4-pro", label="DeepSeek V4"),
+            VariationSpec(slot="C", model="openai/gpt-4o", label="GPT-4o"),
+        ],
     )
     response = await personalize(request, brand, provider)
     assert response.brand == "lakeb2b"
-    assert set(response.emails.keys()) == {1, 2, 3, 4, 5}
-    for draft in response.emails.values():
-        assert draft.subject
-        assert draft.body
+    assert len(response.variations) == 3
+    assert {v.slot for v in response.variations} == {"A", "B", "C"}
+    for v in response.variations:
+        assert v.email.subject
+        assert v.email.body
+        assert v.model
+    # Back-compat: `emails[5]` populated with slot A.
+    assert 5 in response.emails

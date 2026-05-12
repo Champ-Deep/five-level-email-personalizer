@@ -1,0 +1,191 @@
+{
+  "candidate_model": "anthropic/claude-sonnet-4.6",
+  "judge_model": "anthropic/claude-opus-4.1",
+  "overall": {
+    "baseline_mean": 6.083,
+    "candidate_mean": 7.833,
+    "percent_of_baseline": 1.2877
+  },
+  "per_axis": {
+    "specificity_to_prospect": {
+      "baseline": 6.0,
+      "candidate": 7.5,
+      "delta": 1.5
+    },
+    "signal_fusion": {
+      "baseline": 5.75,
+      "candidate": 7.0,
+      "delta": 1.25
+    },
+    "voice_naturalness": {
+      "baseline": 4.75,
+      "candidate": 6.5,
+      "delta": 1.75
+    },
+    "constraint_compliance": {
+      "baseline": 5.75,
+      "candidate": 10.0,
+      "delta": 4.25
+    },
+    "opening_strength": {
+      "baseline": 6.0,
+      "candidate": 7.75,
+      "delta": 1.75
+    },
+    "cta_softness": {
+      "baseline": 8.25,
+      "candidate": 8.25,
+      "delta": 0.0
+    }
+  },
+  "cases": [
+    {
+      "id": "patrick-sherwin-gosun",
+      "baseline_mean": 4.0,
+      "candidate_mean": 8.5,
+      "percent_of_baseline": 2.125,
+      "axes": {
+        "specificity_to_prospect": {
+          "baseline": 4.0,
+          "candidate": 9.0
+        },
+        "signal_fusion": {
+          "baseline": 5.0,
+          "candidate": 8.0
+        },
+        "voice_naturalness": {
+          "baseline": 3.0,
+          "candidate": 7.0
+        },
+        "constraint_compliance": {
+          "baseline": 0.0,
+          "candidate": 10.0
+        },
+        "opening_strength": {
+          "baseline": 4.0,
+          "candidate": 9.0
+        },
+        "cta_softness": {
+          "baseline": 8.0,
+          "candidate": 8.0
+        }
+      },
+      "judge_reasoning": "Email B dominates with concrete, researched details ($292,944 raise, $41M valuation, team size, $5.87M revenue) that prove genuine prospect research, while A relies on generic industry observations. B's opening immediately establishes credibility with specific funding data, whereas A opens with a vague challenge statement. A's two em-dashes tank its constraint compliance to 0, while B follows all rules perfectly. Both CTAs are appropriately soft, but B's superior specificity and signal fusion make it the clear winner.",
+      "candidate_subject": "GoSun's next revenue tier after StartEngine",
+      "candidate_body": "Patrick,\n\nClosing a $292,944 StartEngine round at a $41M valuation is a strong signal that the market believes in portable solar for recreation, disaster relief, and off-grid living. The harder part comes next: turning that momentum into enterprise partnerships with a lean team of under 50 people and a $5.87M revenue base to grow from.\n\nMost founders at this stage hit a wall on outreach because their contact data is stale or too broad to target the right procurement and sustainability buyers. LakeB2B gives revenue teams verified, intent-filtered B2B data so the right conversations start faster.\n\nWorth a quick look?\n\nBest,\nDeep",
+      "baseline_subject": "GoSun's next growth phase and buyer reach",
+      "baseline_body": "Patrick,\n\nExpanding a solar product line across outdoor, off-grid, and emergency prep markets simultaneously is a serious coordination challenge \u2014 especially when component costs shift and logistics windows narrow without warning. What often gets squeezed in that environment is the demand side: finding and reaching the right buyers before momentum slows.\n\nAt LakeB2B, we help hardware-focused companies like GoSun identify and connect with verified buyers across their exact target segments \u2014 so your sales motion keeps pace with your product roadmap rather than trailing it.\n\nWorth a quick look?\n\nBest,\nDeep"
+    },
+    {
+      "id": "brian-halligan-hubspot",
+      "baseline_mean": 7.0,
+      "candidate_mean": 8.0,
+      "percent_of_baseline": 1.1429,
+      "axes": {
+        "specificity_to_prospect": {
+          "baseline": 6.0,
+          "candidate": 7.0
+        },
+        "signal_fusion": {
+          "baseline": 6.0,
+          "candidate": 8.0
+        },
+        "voice_naturalness": {
+          "baseline": 5.0,
+          "candidate": 6.0
+        },
+        "constraint_compliance": {
+          "baseline": 10.0,
+          "candidate": 10.0
+        },
+        "opening_strength": {
+          "baseline": 6.0,
+          "candidate": 8.0
+        },
+        "cta_softness": {
+          "baseline": 9.0,
+          "candidate": 9.0
+        }
+      },
+      "judge_reasoning": "Email A wins by demonstrating deeper knowledge of Brian's journey (building HubSpot with Dharmesh, Frame AI acquisition) and connecting it to a specific technical problem (data quality killing pipeline). Email B mentions AEO and global scale but relies on vaguer claims about 'intelligence sharp enough' and 'how markets move today.' A's opening about bad data killing pipeline is more concrete and earned than B's generic observation about AI evolution.",
+      "candidate_subject": "HubSpot's agentic push and contact data quality",
+      "candidate_body": "Brian,\n\nBuilding HubSpot from the ground up with Dharmesh gave you a front-row seat to how bad contact data quietly kills pipeline before it ever starts. Now, with Frame AI folded in and HubSpot pushing toward an agentic customer platform, the quality of the underlying contact data matters more than it ever did. AI agents are only as reliable as the records they act on. As Executive Chairman, keeping that data layer clean across a global customer base is the kind of problem that compounds fast if it slips. LakeB2B works with revenue teams to verify, enrich, and maintain exactly that layer. Worth a quick look?\n\nBest,\nDeep",
+      "baseline_subject": "AEO launch and the data behind it",
+      "baseline_body": "Brian,\n\nHubSpot AEO arriving in April feels like the natural evolution of inbound for the AI era. As you shape partner strategy and long-term vision from the Executive Chairman seat, I imagine one tension keeps surfacing: ensuring your product bets are fed by intelligence sharp enough to match the ambition of 215,000 customers across 135 countries.\n\nWe help B2B revenue teams at scale find and convert ideal buyers faster with data intelligence that actually reflects how markets move today, not last quarter.\n\nWorth a quick look?\n\nBest,\nDeep"
+    },
+    {
+      "id": "toby-lutke-shopify",
+      "baseline_mean": 6.667,
+      "candidate_mean": 7.833,
+      "percent_of_baseline": 1.175,
+      "axes": {
+        "specificity_to_prospect": {
+          "baseline": 6.0,
+          "candidate": 8.0
+        },
+        "signal_fusion": {
+          "baseline": 5.0,
+          "candidate": 7.0
+        },
+        "voice_naturalness": {
+          "baseline": 5.0,
+          "candidate": 6.0
+        },
+        "constraint_compliance": {
+          "baseline": 10.0,
+          "candidate": 10.0
+        },
+        "opening_strength": {
+          "baseline": 6.0,
+          "candidate": 8.0
+        },
+        "cta_softness": {
+          "baseline": 8.0,
+          "candidate": 8.0
+        }
+      },
+      "judge_reasoning": "Email A demonstrates superior specificity with concrete Shopify details ($292.3B processed, 57% U.S. concentration, snowboarding store origin) that create a compelling narrative about international expansion. Email B relies on more generic observations about FCF and AI that could apply to many SaaS CEOs. A's opening with the personal snowboarding store detail immediately earns attention, while B's financial metrics feel more templated. Both avoid constraint violations, but A's signal fusion from personal history to current challenge to specific solution creates a more persuasive arc.",
+      "candidate_subject": "Shopify's next enterprise push needs clean data",
+      "candidate_body": "Toby,\n\nYou built Shopify's first version for a snowboarding store. Two decades later, your platform processed $292.3 billion in 2024, with 57% concentrated in the U.S. That concentration is the tell: the next growth frontier sits outside American borders, and reaching enterprise brands like Tesla or Nestl\u00e9 in new markets depends on revenue teams having accurate, verified contact data before a single AI-powered outreach tool fires. When contact data is stale, even Shopify's best commerce infrastructure hits a ceiling. LakeB2B helps revenue teams fix that foundation, so expansion targets actually convert. Worth a quick look?\n\nBest,\nDeep",
+      "baseline_subject": "Ten quarters of FCF discipline meets AI scale",
+      "baseline_body": "Toby,\n\nTen consecutive quarters of double-digit free cash flow margins while growing 31% YoY is rare discipline. Even rarer is embedding AI as a performance expectation across the entire org, not just product.\n\nThe tension I'm seeing with platform CEOs right now: proving AI investment translates to durable revenue growth without spooking investors conditioned to software multiples, not AI speculation.\n\nWe help revenue teams at companies scaling AI-native products identify and reach buyers who actually have budget allocated for transformation, not tire-kickers chasing demos.\n\nWorth a quick look?\n\nBest,\nDeep"
+    },
+    {
+      "id": "wade-foster-zapier",
+      "baseline_mean": 6.667,
+      "candidate_mean": 7.0,
+      "percent_of_baseline": 1.05,
+      "axes": {
+        "specificity_to_prospect": {
+          "baseline": 8.0,
+          "candidate": 6.0
+        },
+        "signal_fusion": {
+          "baseline": 7.0,
+          "candidate": 5.0
+        },
+        "voice_naturalness": {
+          "baseline": 6.0,
+          "candidate": 7.0
+        },
+        "constraint_compliance": {
+          "baseline": 3.0,
+          "candidate": 10.0
+        },
+        "opening_strength": {
+          "baseline": 8.0,
+          "candidate": 6.0
+        },
+        "cta_softness": {
+          "baseline": 8.0,
+          "candidate": 8.0
+        }
+      },
+      "judge_reasoning": "Email A has stronger specificity with the 800 AI agents detail and March 2023 hackathon reference, but it uses an em-dash in the opening line ('800+ and climbing') which triggers an automatic -3 penalty on constraint_compliance. Email B is cleaner and more compliant while maintaining decent specificity with the Mizzou origin story and $259M revenue figure. Despite A's more compelling narrative about AI transformation creating tension, B wins on technical execution and avoiding constraint violations.",
+      "candidate_subject": "Zapier's revenue team growth and data quality",
+      "candidate_body": "Wade,\n\nWhat started as a side project at Mizzou in 2011 is now a $259M automation platform with 700 people spread across every time zone. That kind of fully distributed scale puts real pressure on revenue teams, specifically sourcing contacts that are accurate enough to act on without burning pipeline on bad data or stale lists.\n\nAs AI orchestration raises the bar for what no-code platforms can do, the revenue side has to keep pace. At LakeB2B, we help teams like yours build targeted, verified prospect data without the list-vendor headaches.\n\nWorth a quick look?\n\nBest,\nDeep",
+      "baseline_subject": "800 AI agents, one cultural tightrope",
+      "baseline_body": "Wade,\n\nYou now have more AI agents at Zapier than human employees\u2014800+ and climbing. That March 2023 code red after GPT-4 dropped was bold: shutting down for a week-long hackathon that took AI adoption from 10% to 50% overnight.\n\nBut speed like that creates tension. People need time to adapt, and retention becomes fragile when transformation outpaces comfort.\n\nWe help revenue leaders moving this fast identify which prospects actually understand what you're building\u2014so your team spends energy on believers, not skeptics still figuring out what AI even means.\n\nWorth a quick look?\n\nBest,\nDeep"
+    }
+  ]
+}

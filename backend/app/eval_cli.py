@@ -14,7 +14,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from app.services.eval_service import AXES, run_eval
+from app.services.eval_service import AXES, regenerate_missing_baselines, run_eval
 
 
 def _color(value: float) -> str:
@@ -105,9 +105,20 @@ def main() -> int:
     parser.add_argument("--brand", default="lakeb2b")
     parser.add_argument("--golden", default=None, help="Path to golden_emails.json")
     parser.add_argument("--json", action="store_true", help="Emit JSON only")
+    parser.add_argument("--regen", action="store_true", help="Regenerate missing baselines via Chief's exact prompts before evaluating")
+    parser.add_argument("--regen-force", action="store_true", help="Regenerate ALL baselines (overwrite existing)")
     args = parser.parse_args()
 
     golden_path = Path(args.golden) if args.golden else None
+
+    if args.regen or args.regen_force:
+        n = asyncio.run(regenerate_missing_baselines(
+            candidate_model=args.candidate,
+            path=golden_path,
+            force=args.regen_force,
+        ))
+        sys.stderr.write(f"[regen] generated {n} baseline(s) via chief_replica\n")
+
     report = asyncio.run(run_eval(
         candidate_model=args.candidate,
         judge_model=args.judge,

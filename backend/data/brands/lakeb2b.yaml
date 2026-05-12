@@ -26,4 +26,4 @@ system_prompt_addendum: |
 
 voice_keywords: [enabling, growth, data intelligence, demand generation]
 
-default_model: anthropic/claude-sonnet-4.5
+default_model: anthropic/claude-sonnet-4.6

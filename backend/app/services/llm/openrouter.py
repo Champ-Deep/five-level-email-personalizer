@@ -58,8 +58,17 @@ class OpenRouterProvider:
             raise LLMError(f"OpenRouter returned no choices: {data}")
         message = choices[0].get("message") or {}
         content = message.get("content")
-        if not isinstance(content, str):
-            raise LLMError(f"Unexpected response shape: {data}")
+        # Reasoning models (DeepSeek V4 Pro, R1, etc.) sometimes deliver the
+        # final answer inside `reasoning` when they truncate before emitting
+        # `content`. Try to recover JSON from there.
+        if not isinstance(content, str) or not content.strip():
+            reasoning = message.get("reasoning")
+            if isinstance(reasoning, str) and "{" in reasoning and "}" in reasoning:
+                content = reasoning
+            else:
+                finish = choices[0].get("finish_reason")
+                hint = " — hit token limit, bump max_tokens" if finish == "length" else ""
+                raise LLMError(f"Unexpected response shape (finish_reason={finish}{hint}): {str(data)[:400]}")
         return content
 
     async def chat(

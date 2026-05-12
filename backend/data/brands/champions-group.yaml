@@ -30,4 +30,4 @@ system_prompt_addendum: |
 
 voice_keywords: [innovation, resilience, ecosystem, premium, multi-venture]
 
-default_model: anthropic/claude-sonnet-4.5
+default_model: anthropic/claude-sonnet-4.6

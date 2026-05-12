@@ -48,12 +48,32 @@ class LeveledEmail(BaseModel):
     email: EmailDraft
 
 
+class VariationSpec(BaseModel):
+    slot: str = Field(..., description="Stable identifier (A, B, C, …)")
+    model: str = Field(..., description="OpenRouter model slug")
+    label: str = Field("", description="Human-readable name shown in the UI")
+
+
+class Variation(BaseModel):
+    slot: str
+    label: str
+    model: str
+    email: EmailDraft
+
+
 class PersonalizeRequest(BaseModel):
     prospect: ProspectInput
     sender: Optional[SenderInput] = None
-    levels: list[int] = Field(default_factory=lambda: [1, 2, 3, 4, 5])
+    levels: list[int] = Field(default_factory=lambda: [5])
     provider: str = "openrouter"
-    model: Optional[str] = None
+    model: Optional[str] = Field(
+        default=None,
+        description="Single-model legacy path. If `variations` is set, this is ignored.",
+    )
+    variations: Optional[list[VariationSpec]] = Field(
+        default=None,
+        description="When set, generate one fused-5-layer email per variation. Defaults to env-configured A/B/C slots.",
+    )
     system_prompt_override: Optional[str] = None
     style_rules: Optional[str] = Field(
         default=None,
@@ -64,14 +84,18 @@ class PersonalizeRequest(BaseModel):
 class PersonalizeResponse(BaseModel):
     brand: str
     brief: Brief
-    emails: dict[int, EmailDraft]
+    variations: list[Variation] = Field(default_factory=list)
+    # `emails` kept for backward compat with single-model callers (eval harness, SDK).
+    # Populated with one entry keyed by the highest level requested, using slot A.
+    emails: dict[int, EmailDraft] = Field(default_factory=dict)
 
 
 class BatchPersonalizeRequest(BaseModel):
     prospects: list[ProspectInput]
     sender: Optional[SenderInput] = None
-    levels: list[int] = Field(default_factory=lambda: [1, 2, 3, 4, 5])
+    levels: list[int] = Field(default_factory=lambda: [5])
     provider: str = "openrouter"
     model: Optional[str] = None
+    variations: Optional[list[VariationSpec]] = None
     system_prompt_override: Optional[str] = None
     style_rules: Optional[str] = None

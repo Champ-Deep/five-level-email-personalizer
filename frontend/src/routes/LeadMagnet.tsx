@@ -3,10 +3,10 @@ import { Link, useParams } from "react-router-dom";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { BriefPanel } from "@/components/BriefPanel";
-import { EmailCard } from "@/components/EmailCard";
 import { LayersUsed } from "@/components/LayersUsed";
 import { LeadGate } from "@/components/LeadGate";
 import { PersonalizerForm } from "@/components/PersonalizerForm";
+import { VariationCard } from "@/components/VariationCard";
 import { api, getToken, type BrandConfig, type PersonalizeBody, type PersonalizeResponse } from "@/lib/api";
 import { applyBrandTokens } from "@/lib/brandTokens";
 
@@ -27,6 +27,7 @@ export function LeadMagnetRoute() {
   });
   const [styleRules, setStyleRules] = useState<string>("");
   const [response, setResponse] = useState<PersonalizeResponse | null>(null);
+  const [pickedSlot, setPickedSlot] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [gateOpen, setGateOpen] = useState(false);
@@ -59,6 +60,7 @@ export function LeadMagnetRoute() {
     setRunning(true);
     setErr(null);
     setResponse(null);
+    setPickedSlot(null);
     try {
       const body: PersonalizeBody = {
         prospect: {
@@ -84,7 +86,7 @@ export function LeadMagnetRoute() {
   if (brandErr) return <div className="p-10 text-sm">Failed to load brand: {brandErr}</div>;
   if (!brand) return <div className="p-10 text-sm">Loading…</div>;
 
-  const fusedEmail = response?.emails?.[FUSED_LEVEL] ?? null;
+  const variations = response?.variations ?? [];
 
   return (
     <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
@@ -150,15 +152,30 @@ export function LeadMagnetRoute() {
             <LayersUsed brief={response.brief} />
 
             <div>
-              <div className="mb-2 text-[11px] font-bold tracking-[0.15em]" style={{ color: "var(--brand-muted)" }}>
-                YOUR PERSONALIZED EMAIL
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-[11px] font-bold tracking-[0.15em]" style={{ color: "var(--brand-muted)" }}>
+                  {variations.length} VARIATIONS · ALL FUSED FROM 5 SIGNAL LAYERS · PICK THE ONE YOU'D SEND
+                </div>
+                {pickedSlot && (
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-bold"
+                    style={{ background: "var(--brand-accent)", color: "var(--brand-bg)" }}
+                  >
+                    Slot {pickedSlot} picked
+                  </span>
+                )}
               </div>
-              <EmailCard
-                level={FUSED_LEVEL}
-                email={fusedEmail}
-                loading={false}
-                senderName={sender.name || brand.sender_default.name || brand.name}
-              />
+              <div className="space-y-3">
+                {variations.map(v => (
+                  <VariationCard
+                    key={v.slot}
+                    variation={v}
+                    senderName={sender.name || brand.sender_default.name || brand.name}
+                    picked={pickedSlot === v.slot}
+                    onPick={() => setPickedSlot(prev => (prev === v.slot ? null : v.slot))}
+                  />
+                ))}
+              </div>
             </div>
 
             {!hasToken && (

@@ -196,9 +196,48 @@ async def _judge_pair(
     return axes, data.get("reasoning", "")
 
 
+def _default_golden_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "data" / "eval" / "golden_emails.json"
+
+
 def load_golden(path: Optional[Path] = None) -> list[dict[str, Any]]:
-    p = path or Path(__file__).resolve().parents[2] / "data" / "eval" / "golden_emails.json"
-    return json.loads(p.read_text())["cases"]
+    return json.loads((path or _default_golden_path()).read_text())["cases"]
+
+
+async def regenerate_missing_baselines(
+    *,
+    candidate_model: Optional[str] = None,
+    path: Optional[Path] = None,
+    force: bool = False,
+) -> int:
+    """Fill in any `baseline: null` entries by running Chief's exact prompts.
+
+    Returns the number of cases that were freshly generated.
+    Writes the updated JSON back to disk so subsequent eval runs are reproducible.
+    """
+    from app.services.chief_replica import chief_baseline_email
+
+    p = path or _default_golden_path()
+    doc = json.loads(p.read_text())
+    model = candidate_model or get_settings().openrouter_default_model
+    provider = get_provider("openrouter")
+
+    generated = 0
+    for case in doc["cases"]:
+        if case.get("baseline") and not force:
+            continue
+        prospect = ProspectInput(**case["prospect"])
+        sender = SenderInput(**case["sender"])
+        _brief, draft = await chief_baseline_email(prospect, sender, provider, model=model)
+        case["baseline"] = {
+            "source": f"chief_replica.py via OpenRouter ({model}), regenerated",
+            "subject": draft.subject,
+            "body": draft.body + f"\n\nBest,\n{sender.name}" if not draft.body.rstrip().endswith(sender.name) else draft.body,
+        }
+        generated += 1
+
+    p.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+    return generated
 
 
 async def run_eval(
@@ -222,7 +261,9 @@ async def run_eval(
         sender_in = SenderInput(**case["sender"])
         baseline = case["baseline"]
 
-        # Generate our candidate using the same prospect+sender.
+        # Generate our candidate using the same prospect+sender. Eval scores
+        # the A slot only (single-model comparison vs Chief). To eval other
+        # slots, pass --candidate <model-slug>.
         response = await personalize_one(
             prospect_in,
             brand,
@@ -231,7 +272,13 @@ async def run_eval(
             levels=[5],
             model=candidate_model,
         )
-        cand_email = response.emails[5]
+        cand_email = (
+            response.emails[5]
+            if 5 in response.emails
+            else (response.variations[0].email if response.variations else None)
+        )
+        if cand_email is None:
+            raise RuntimeError(f"Candidate generation returned no email for case {case['id']}")
         candidate_payload = {
             "subject": cand_email.subject,
             "body": _append_signoff(cand_email.body, sender_in.name),
