@@ -89,6 +89,7 @@ export interface PersonalizeBody {
   provider?: string;
   model?: string;
   system_prompt_override?: string | null;
+  style_rules?: string | null;
 }
 
 export const api = {

@@ -108,13 +108,47 @@ class OpenRouterProvider:
 def extract_json(text: str) -> Any:
     """Pull the first/last brace-delimited JSON object out of an LLM response.
 
-    Defensive: handles surrounding prose, markdown fences, and trailing text.
+    Defensive against the common LLM mistakes: code fences, smart quotes,
+    trailing commas, control characters in strings.
     """
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
         raise LLMError(f"No JSON object found in: {text[:200]}")
-    try:
-        return json.loads(text[start : end + 1])
-    except json.JSONDecodeError as e:
-        raise LLMError(f"Invalid JSON: {e}") from e
+
+    candidate = text[start : end + 1]
+    attempts: list[str] = [candidate]
+
+    # Strategy: progressively repair common LLM-produced JSON sins.
+    repaired = _repair_quotes(candidate)
+    if repaired != candidate:
+        attempts.append(repaired)
+
+    no_trailing = _strip_trailing_commas(repaired)
+    if no_trailing != repaired:
+        attempts.append(no_trailing)
+
+    last_err: Exception | None = None
+    for attempt in attempts:
+        try:
+            return json.loads(attempt)
+        except json.JSONDecodeError as e:
+            last_err = e
+    raise LLMError(f"Invalid JSON after repair attempts: {last_err}. First 400 chars: {candidate[:400]!r}") from last_err
+
+
+def _repair_quotes(s: str) -> str:
+    """Replace smart quotes that some models slip into string values."""
+    return (
+        s.replace("“", '"')
+         .replace("”", '"')
+         .replace("‘", "'")
+         .replace("’", "'")
+    )
+
+
+def _strip_trailing_commas(s: str) -> str:
+    """Remove ',}' and ',]' which json.loads rejects but LLMs love."""
+    import re as _re
+    s = _re.sub(r",(\s*[}\]])", r"\1", s)
+    return s

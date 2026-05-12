@@ -14,7 +14,8 @@ export function EmailCard({ level, email, loading, senderName }: Props) {
   const [open, setOpen] = useState(true);
   const meta = levelMeta(level);
 
-  const fullText = email ? `Subject: ${email.subject}\n\n${email.body}\n\nBest,\n${senderName}` : "";
+  const bodyWithoutSignoff = email ? email.body.replace(/\s*Best,\s*[^\n]*\s*$/i, "").trim() : "";
+  const fullText = email ? `Subject: ${email.subject}\n\n${bodyWithoutSignoff}\n\nBest,\n${senderName}` : "";
 
   return (
     <div

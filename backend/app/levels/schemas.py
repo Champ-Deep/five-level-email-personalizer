@@ -55,6 +55,10 @@ class PersonalizeRequest(BaseModel):
     provider: str = "openrouter"
     model: Optional[str] = None
     system_prompt_override: Optional[str] = None
+    style_rules: Optional[str] = Field(
+        default=None,
+        description="Free-text additional style rules from the caller. Appended to the brand voice; does NOT replace it.",
+    )
 
 
 class PersonalizeResponse(BaseModel):
@@ -70,3 +74,4 @@ class BatchPersonalizeRequest(BaseModel):
     provider: str = "openrouter"
     model: Optional[str] = None
     system_prompt_override: Optional[str] = None
+    style_rules: Optional[str] = None

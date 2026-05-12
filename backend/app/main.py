@@ -18,9 +18,19 @@ from app.db.postgres import init_db, dispose_engine
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await init_db()
+    # DB is only needed by /leads, /auth, /personalize/batch, /jobs. Lead-magnet
+    # and single /personalize work without it — degrade gracefully so the
+    # frontend is testable before infra is set up.
+    import logging
+    try:
+        await init_db()
+    except Exception as e:
+        logging.warning("Skipping DB init (Postgres unreachable): %s", e)
     yield
-    await dispose_engine()
+    try:
+        await dispose_engine()
+    except Exception:
+        pass
 
 
 def create_app() -> FastAPI:

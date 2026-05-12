@@ -1,0 +1,80 @@
+{
+  "candidate_model": "anthropic/claude-sonnet-4.5",
+  "judge_model": "anthropic/claude-opus-4.1",
+  "overall": {
+    "baseline_mean": 5.167,
+    "candidate_mean": 8.0,
+    "percent_of_baseline": 1.5484
+  },
+  "per_axis": {
+    "specificity_to_prospect": {
+      "baseline": 3.0,
+      "candidate": 8.0,
+      "delta": 5.0
+    },
+    "signal_fusion": {
+      "baseline": 4.0,
+      "candidate": 7.0,
+      "delta": 3.0
+    },
+    "voice_naturalness": {
+      "baseline": 5.0,
+      "candidate": 6.0,
+      "delta": 1.0
+    },
+    "constraint_compliance": {
+      "baseline": 7.0,
+      "candidate": 10.0,
+      "delta": 3.0
+    },
+    "opening_strength": {
+      "baseline": 3.0,
+      "candidate": 8.0,
+      "delta": 5.0
+    },
+    "cta_softness": {
+      "baseline": 9.0,
+      "candidate": 9.0,
+      "delta": 0.0
+    }
+  },
+  "cases": [
+    {
+      "id": "patrick-sherwin-gosun",
+      "baseline_mean": 5.167,
+      "candidate_mean": 8.0,
+      "percent_of_baseline": 1.5484,
+      "axes": {
+        "specificity_to_prospect": {
+          "baseline": 3.0,
+          "candidate": 8.0
+        },
+        "signal_fusion": {
+          "baseline": 4.0,
+          "candidate": 7.0
+        },
+        "voice_naturalness": {
+          "baseline": 5.0,
+          "candidate": 6.0
+        },
+        "constraint_compliance": {
+          "baseline": 7.0,
+          "candidate": 10.0
+        },
+        "opening_strength": {
+          "baseline": 3.0,
+          "candidate": 8.0
+        },
+        "cta_softness": {
+          "baseline": 9.0,
+          "candidate": 9.0
+        }
+      },
+      "judge_reasoning": "Email A demonstrates superior research with concrete signals (2016 founding, 80 countries, sub-20 team, $41M valuation, September StartEngine close) while B relies on generic industry observations. A's opening immediately establishes credibility with specific achievements, while B opens with a vague challenge statement. Both emails avoid constraint violations, but A's specificity and signal density make it far more likely to earn a response from a founder who would recognize the research effort.",
+      "candidate_subject": "GoSun's 80-country footprint and data clarity",
+      "candidate_body": "Patrick,\n\nYou took GoSun from a garage in 2016 to distribution across 80 countries with a team of under 20 people. That's rare. The September equity close on StartEngine puts you at $41M valuation, and as consumer solar shifts from enthusiast gear to mainstream prep and recreation, the next stage is figuring out which markets and channels actually drive margin.\n\nMost founders at this inflection point hit the same wall: customer and prospect data spread across systems that can't tell you where to double down. We help revenue teams at scale-stage companies unify that picture so you can allocate resources with confidence instead of intuition.\n\nWorth a quick look?\n\nBest,\nDeep",
+      "baseline_subject": "GoSun's next growth phase and buyer reach",
+      "baseline_body": "Patrick,\n\nExpanding a solar product line across outdoor, off-grid, and emergency prep markets simultaneously is a serious coordination challenge \u2014 especially when component costs shift and logistics windows narrow without warning. What often gets squeezed in that environment is the demand side: finding and reaching the right buyers before momentum slows.\n\nAt LakeB2B, we help hardware-focused companies like GoSun identify and connect with verified buyers across their exact target segments \u2014 so your sales motion keeps pace with your product roadmap rather than trailing it.\n\nWorth a quick look?\n\nBest,\nDeep"
+    }
+  ]
+}

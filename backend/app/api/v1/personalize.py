@@ -24,16 +24,8 @@ from app.services.personalizer import personalize
 router = APIRouter(prefix="/personalize", tags=["personalize"])
 
 
-def _rate_limit_for_subject(subj: Optional[TokenSubject]) -> str:
-    if subj is None:
-        return "1/day"
-    if subj.kind == "lead":
-        return "20/day"
-    return "1000/day"
-
-
 @router.post("", response_model=PersonalizeResponse)
-@limiter.limit(lambda request: _rate_limit_for_subject(getattr(request.state, "subject", None)))
+@limiter.limit("30/day")
 async def personalize_endpoint(
     request: Request,
     body: PersonalizeRequest,

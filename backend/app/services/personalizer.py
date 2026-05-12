@@ -5,7 +5,13 @@ import re
 from typing import Optional
 
 from app.core.config import get_settings
-from app.levels.prompts import BANNED_WORDS, email_prompt, system_prompt
+from app.levels.prompts import (
+    BANNED_WORDS,
+    EM_DASH_CHARS,
+    NOT_X_BUT_Y_PATTERNS,
+    email_prompt,
+    system_prompt,
+)
 from app.levels.schemas import (
     Brief,
     EmailDraft,
@@ -44,10 +50,24 @@ def _validate(draft: EmailDraft) -> list[str]:
     elif body_words > 120:
         warnings.append(f"body is {body_words} words (max 120)")
 
-    lower = (draft.subject + "\n" + draft.body).lower()
+    full = draft.subject + "\n" + draft.body
+    lower = full.lower()
+
     for word in BANNED_WORDS:
         if word in lower:
             warnings.append(f"contains banned phrase: '{word}'")
+
+    for dash in EM_DASH_CHARS:
+        if dash in full:
+            warnings.append(f"contains em/en-dash '{dash}' (use commas or periods)")
+            break
+
+    for pattern in NOT_X_BUT_Y_PATTERNS:
+        m = re.search(pattern, lower)
+        if m:
+            warnings.append(f"contains AI cliché 'not X, but Y': '{m.group(0).strip()}'")
+            break
+
     return warnings
 
 
@@ -69,17 +89,19 @@ async def _generate_one(
     model: str,
     brand: BrandConfig,
     system_override: Optional[str],
+    style_rules: Optional[str],
     semaphore: asyncio.Semaphore,
 ) -> EmailDraft:
     prompt = email_prompt(level, brief, sender, prospect_title)
-    sys_addendum = system_override if system_override is not None else brand.system_prompt_addendum
+    brand_addendum = system_override if system_override is not None else brand.system_prompt_addendum
+    composed_system = system_prompt(brand_addendum, style_rules)
     async with semaphore:
         raw = await provider.chat(
             [{"role": "user", "content": prompt}],
             model=model,
             max_tokens=900,
             temperature=0.7,
-            system=system_prompt(sys_addendum),
+            system=composed_system,
         )
     data = _normalize_email_keys(extract_json(raw))
     draft = EmailDraft(
@@ -92,7 +114,7 @@ async def _generate_one(
     if warnings:
         draft.warnings = warnings
         retry = await _retry_strict(
-            prompt, warnings, provider, model, sys_addendum, semaphore
+            prompt, warnings, provider, model, composed_system, semaphore
         )
         if retry is not None:
             return retry
@@ -104,7 +126,7 @@ async def _retry_strict(
     warnings: list[str],
     provider: LLMProvider,
     model: str,
-    sys_addendum: str | None,
+    composed_system: str,
     semaphore: asyncio.Semaphore,
 ) -> Optional[EmailDraft]:
     correction = (
@@ -122,7 +144,7 @@ async def _retry_strict(
                 model=model,
                 max_tokens=900,
                 temperature=0.4,
-                system=system_prompt(sys_addendum),
+                system=composed_system,
             )
         except LLMError:
             return None
@@ -169,6 +191,7 @@ async def personalize(
             model=model,
             brand=brand,
             system_override=request.system_prompt_override,
+            style_rules=request.style_rules,
             semaphore=semaphore,
         )
         for lvl in request.levels
@@ -200,6 +223,7 @@ async def personalize_one(
     levels: Optional[list[int]] = None,
     model: Optional[str] = None,
     system_prompt_override: Optional[str] = None,
+    style_rules: Optional[str] = None,
 ) -> PersonalizeResponse:
     """Convenience entrypoint for SDK / worker callers."""
     request = PersonalizeRequest(
@@ -209,5 +233,6 @@ async def personalize_one(
         provider=provider.name,
         model=model,
         system_prompt_override=system_prompt_override,
+        style_rules=style_rules,
     )
     return await personalize(request, brand, provider)

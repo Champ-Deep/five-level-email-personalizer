@@ -19,7 +19,21 @@ async def research_prospect(
         temperature=0.4,
         system=system_prompt(brand_addendum),
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except Exception:
+        # One retry: ask for valid JSON only, without web search this time.
+        raw = await provider.chat(
+            [
+                {"role": "user", "content": prompt},
+                {"role": "user", "content": "Your previous response could not be parsed as JSON. Return ONLY the JSON object — no preamble, no code fences, no smart quotes, no trailing commas."},
+            ],
+            model=settings.openrouter_default_model,
+            max_tokens=2000,
+            temperature=0.2,
+            system=system_prompt(brand_addendum),
+        )
+        data = extract_json(raw)
     return Brief(**_normalize(data, prospect))
 
 

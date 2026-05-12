@@ -12,14 +12,48 @@ from app.levels.schemas import Brief, ProspectInput, SenderInput
 
 SYSTEM_PROMPT_BASE = (
     "You are an elite B2B cold-email strategist. "
-    "Return ONLY valid JSON — no markdown fences, no preamble, no explanation."
+    "Return ONLY valid JSON. No markdown fences, no preamble, no explanation."
 )
 
+# Hard rules that apply to EVERY call, regardless of brand or user override.
+# Designed to strip the most common "AI sounds like AI" tells.
+ANTI_SLOP_RULES = """\
+Hard writing rules (every email, no exceptions):
 
-def system_prompt(brand_addendum: str | None) -> str:
-    if not brand_addendum:
-        return SYSTEM_PROMPT_BASE
-    return f"{SYSTEM_PROMPT_BASE}\n\nBrand voice:\n{brand_addendum.strip()}"
+1. NO em-dashes (—). Use commas, periods, or em-dash-free phrasing instead. \
+Hyphens between words ("data-driven") are fine. An en-dash or em-dash is not.
+2. NO "not X, but Y" or "it's not just X, it's Y" constructions. These are the single biggest AI tell. \
+Rewrite as a direct statement.
+3. NO AI-slop vocabulary: delve, leverage, leveraging, navigate, navigating, \
+landscape, ecosystem (unless the prospect literally builds one), tapestry, realm, \
+robust, comprehensive, holistic, seamless, seamlessly, unlock, unlocking, empower, \
+empowering, supercharge, supercharging, game-changer, game-changing, paradigm, \
+streamline, streamlining, synergy, synergistic, revolutionize, revolutionise, \
+transformative, transformational, cutting-edge, best-in-class, world-class, \
+in today's fast-paced world, in today's rapidly evolving.
+4. NO opener clichés: "hope this finds you", "I wanted to reach out", \
+"I came across your", "I noticed that you", "I hope you're doing well", "quick question".
+5. NO marketing throat-clearing: "I'll be brief", "I'll keep this short", \
+"long story short", "to be honest", "frankly".
+6. NO em-dashes again (it bears repeating because models love them).
+7. Plain prose only. Short sentences over long ones. Use specific concrete nouns \
+(Stripe's Dublin office, Series B, March launch) rather than abstract ones."""
+
+
+def system_prompt(
+    brand_addendum: str | None = None,
+    style_rules: str | None = None,
+) -> str:
+    """Compose the full system prompt: base + hard anti-slop rules + brand voice + user rules.
+
+    All three layers are additive — `style_rules` does NOT replace the brand voice.
+    """
+    parts = [SYSTEM_PROMPT_BASE, ANTI_SLOP_RULES]
+    if brand_addendum and brand_addendum.strip():
+        parts.append(f"Brand voice:\n{brand_addendum.strip()}")
+    if style_rules and style_rules.strip():
+        parts.append(f"Additional caller-provided rules (must override anything that conflicts above):\n{style_rules.strip()}")
+    return "\n\n".join(parts)
 
 
 def research_prompt(prospect: ProspectInput) -> str:
@@ -82,10 +116,20 @@ def _level_instruction(level: int, brief: Brief, prospect_title: str) -> str:
             f"Make them feel genuinely seen."
         )
     if level == 5:
+        industry_trend = brief.industry_trends[0] if brief.industry_trends else f"recent shifts in {brief.industry}"
         return (
-            f"Write a Level 5 HYPER-PERSONALIZED email weaving together: "
-            f'company signal ("{first_company_signal}"), individual insight ("{first_individual}"), '
-            f'and role pain ("{first_pain}"). This email should feel written for this one human being, not a persona.'
+            "Write ONE hyper-personalized email that FUSES ALL FIVE signal layers into a single, cohesive message. "
+            "The email must explicitly weave together every layer below — not skip any, not bullet them, not "
+            "stack them, but synthesize them into one continuous argument:\n\n"
+            f"  · INDUSTRY layer (the macro context): \"{industry_trend}\"\n"
+            f"  · COMPANY layer (something specific to {brief.company}): \"{first_company_signal}\"\n"
+            f"  · ROLE layer (a pressure specific to a {prospect_title}): \"{first_pain}\"\n"
+            f"  · INDIVIDUAL layer (something about {brief.name} personally): \"{first_individual}\"\n"
+            f"  · HYPER layer (your synthesized POV / hypothesis): \"{brief.likely_pain_point}\"\n\n"
+            "Open with the individual or company layer — never with industry generalities. Build a hypothesis "
+            "in the middle that ties them together. End with the soft permission-ask. The email should read as "
+            "one human writing to one specific human, not a templated drip. ALL FIVE layers must be observably "
+            "present in the final email."
         )
     raise ValueError(f"Unknown level: {level}")
 
@@ -130,16 +174,32 @@ Return ONLY this JSON (no fences, no explanation):
 
 
 BANNED_WORDS: tuple[str, ...] = (
-    "synergy",
-    "synergies",
-    "leverage",
-    "leveraging",
-    "streamline",
-    "streamlining",
-    "game-changer",
-    "game changer",
-    "revolutionize",
-    "revolutionise",
-    "hope this finds you",
-    "wanted to reach out",
+    # Existing
+    "synergy", "synergies", "leverage", "leveraging",
+    "streamline", "streamlining", "game-changer", "game changer",
+    "revolutionize", "revolutionise",
+    "hope this finds you", "wanted to reach out",
+    # AI-slop vocabulary
+    "delve", "navigate", "navigating", "landscape", "tapestry", "realm",
+    "robust", "comprehensive", "holistic", "seamless", "seamlessly",
+    "unlock", "unlocking", "empower", "empowering",
+    "supercharge", "supercharging", "paradigm",
+    "transformative", "transformational",
+    "cutting-edge", "best-in-class", "world-class",
+    # Opener clichés
+    "i came across your", "i noticed that you", "hope you're doing well",
+    "quick question", "i'll be brief", "i'll keep this short",
+    "long story short", "to be honest", "frankly,",
+    "in today's fast-paced", "in today's rapidly evolving",
+)
+
+# Em-dash characters (NOT hyphen-minus). Includes em-dash and en-dash.
+EM_DASH_CHARS: tuple[str, ...] = ("—", "–")
+
+# "Not X, but Y" / "It's not just X, it's Y" pattern detection.
+# Catches the most common AI cliché construction.
+NOT_X_BUT_Y_PATTERNS: tuple[str, ...] = (
+    r"\bnot\s+(?:just\s+)?[^.,;]{1,40},\s+but\b",
+    r"\bit's\s+not\s+(?:just\s+)?[^.,;]{1,40},?\s+it's\b",
+    r"\bit\s+is\s+not\s+(?:just\s+)?[^.,;]{1,40},?\s+it\s+is\b",
 )

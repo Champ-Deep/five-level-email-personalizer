@@ -1,0 +1,31 @@
+{
+  "rubric": [
+    "specificity_to_prospect (0-10): how concretely the email references real signals about the specific prospect/company, not generic claims",
+    "signal_fusion (0-10): how well it weaves industry + company + role + individual + synthesized POV layers into one coherent argument",
+    "voice_naturalness (0-10): how human/founder-to-founder the prose reads — penalizes AI tells, generic SaaS-speak, throat-clearing",
+    "constraint_compliance (0-10): no em-dashes, no buzzwords, no 'not X but Y', no opener clichés, single sign-off, subject under 8 words, body 65-120 words",
+    "opening_strength (0-10): how compelling the first sentence is — does it earn the read or read like a templated outbound",
+    "cta_softness (0-10): does it end with a soft permission-ask (e.g. 'worth a quick look?') vs. a hard 'book a demo'"
+  ],
+  "cases": [
+    {
+      "id": "patrick-sherwin-gosun",
+      "prospect": {
+        "name": "Patrick Sherwin",
+        "title": "Founder",
+        "domain": "gosun.co"
+      },
+      "sender": {
+        "name": "Deep",
+        "company": "LakeB2B",
+        "offer": "B2B data intelligence and demand generation — helping revenue teams find, reach, and convert their ideal buyers faster."
+      },
+      "baseline": {
+        "source": "claude.ai artifact (Chief's version), L5 Hyper-Personal output, captured 2026-05-12",
+        "url": "https://claude.ai/public/artifacts/ef1d4c47-d8fd-4f8c-a2ce-a2de787e8b43",
+        "subject": "GoSun's next growth phase and buyer reach",
+        "body": "Patrick,\n\nExpanding a solar product line across outdoor, off-grid, and emergency prep markets simultaneously is a serious coordination challenge — especially when component costs shift and logistics windows narrow without warning. What often gets squeezed in that environment is the demand side: finding and reaching the right buyers before momentum slows.\n\nAt LakeB2B, we help hardware-focused companies like GoSun identify and connect with verified buyers across their exact target segments — so your sales motion keeps pace with your product roadmap rather than trailing it.\n\nWorth a quick look?\n\nBest,\nDeep"
+      }
+    }
+  ]
+}

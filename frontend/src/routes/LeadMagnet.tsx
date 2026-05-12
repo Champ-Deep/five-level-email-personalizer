@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { BriefPanel } from "@/components/BriefPanel";
 import { EmailCard } from "@/components/EmailCard";
+import { LayersUsed } from "@/components/LayersUsed";
 import { LeadGate } from "@/components/LeadGate";
-import { LevelPills } from "@/components/LevelPills";
 import { PersonalizerForm } from "@/components/PersonalizerForm";
 import { api, getToken, type BrandConfig, type PersonalizeBody, type PersonalizeResponse } from "@/lib/api";
 import { applyBrandTokens } from "@/lib/brandTokens";
-import { LEVELS } from "@/lib/levels";
+
+const FUSED_LEVEL = 5;
 
 export function LeadMagnetRoute() {
   const params = useParams<{ brand: string }>();
@@ -24,6 +25,7 @@ export function LeadMagnetRoute() {
   const [sender, setSender] = useState<NonNullable<PersonalizeBody["sender"]>>({
     name: "", company: "", offer: "",
   });
+  const [styleRules, setStyleRules] = useState<string>("");
   const [response, setResponse] = useState<PersonalizeResponse | null>(null);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -66,7 +68,8 @@ export function LeadMagnetRoute() {
           ...(prospect.linkedin ? { linkedin: prospect.linkedin } : {}),
         },
         sender: { name: sender.name || "—", company: sender.company, offer: sender.offer },
-        levels: [1, 2, 3, 4, 5],
+        levels: [FUSED_LEVEL],
+        ...(styleRules.trim() ? { style_rules: styleRules.trim() } : {}),
       };
       const result = await api.personalize(body, brand.slug);
       setResponse(result);
@@ -76,12 +79,12 @@ export function LeadMagnetRoute() {
     } finally {
       setRunning(false);
     }
-  }, [brand, canRunMore, prospect, sender]);
-
-  const levels = useMemo(() => LEVELS.map(l => l.id), []);
+  }, [brand, canRunMore, prospect, sender, styleRules]);
 
   if (brandErr) return <div className="p-10 text-sm">Failed to load brand: {brandErr}</div>;
   if (!brand) return <div className="p-10 text-sm">Loading…</div>;
+
+  const fusedEmail = response?.emails?.[FUSED_LEVEL] ?? null;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
@@ -110,61 +113,68 @@ export function LeadMagnetRoute() {
             className="mx-auto mt-4 max-w-xl text-base leading-relaxed"
             style={{ color: "var(--brand-muted)" }}
           >
-            Enter a prospect — AI researches them live and writes five emails, from broad industry signal to hyper-personal. {brand.tagline && <strong style={{ color: "var(--brand-accent)" }}> · {brand.tagline}</strong>}
+            Drop in a prospect. AI researches them live, then writes one cold email that fuses all five signal layers — industry, company, role, individual, and a synthesized POV.
+            {brand.tagline && <strong style={{ color: "var(--brand-accent)" }}> · {brand.tagline}</strong>}
           </p>
-          <div className="mt-6"><LevelPills /></div>
         </section>
 
         {!response ? (
           <PersonalizerForm
             prospect={prospect}
             sender={sender}
+            styleRules={styleRules}
             setProspect={setProspect}
             setSender={setSender}
+            setStyleRules={setStyleRules}
             onSubmit={onSubmit}
             running={running}
             brandName={brand.name}
           />
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
               <button
-                onClick={() => { setResponse(null); }}
+                onClick={() => setResponse(null)}
                 className="text-sm font-semibold"
                 style={{ color: "var(--brand-accent)" }}
               >
                 ← New prospect
               </button>
               <div className="text-xs" style={{ color: "var(--brand-muted)" }}>
-                {hasToken ? "Unlocked · 20/day" : `Free tier · 1 run used`}
+                {hasToken ? "Unlocked · 20/day" : "Free tier · 1 run used"}
               </div>
             </div>
+
             <BriefPanel brief={response.brief} />
-            <div className="space-y-3">
-              {levels.map(lvl => (
-                <EmailCard
-                  key={lvl}
-                  level={lvl}
-                  email={response.emails[lvl] ?? null}
-                  loading={false}
-                  senderName={sender.name || brand.sender_default.name || brand.name}
-                />
-              ))}
+
+            <LayersUsed brief={response.brief} />
+
+            <div>
+              <div className="mb-2 text-[11px] font-bold tracking-[0.15em]" style={{ color: "var(--brand-muted)" }}>
+                YOUR PERSONALIZED EMAIL
+              </div>
+              <EmailCard
+                level={FUSED_LEVEL}
+                email={fusedEmail}
+                loading={false}
+                senderName={sender.name || brand.sender_default.name || brand.name}
+              />
             </div>
+
             {!hasToken && (
               <div
-                className="mt-6 rounded-xl border px-5 py-5 text-center"
+                className="mt-2 rounded-xl border px-5 py-5 text-center"
                 style={{ background: "var(--brand-accent-soft)", borderColor: "var(--brand-rule)" }}
               >
                 <div className="mb-2 text-sm font-bold" style={{ color: "var(--brand-ink)" }}>
-                  Want more — and a CSV batch?
+                  Want to run this on a list of 20 prospects in one go?
                 </div>
                 <button
                   onClick={() => setGateOpen(true)}
                   className="rounded-lg px-5 py-2.5 text-sm font-bold"
                   style={{ background: "var(--brand-accent)", color: "var(--brand-bg)" }}
                 >
-                  Unlock 20/day + cheat-sheet PDF
+                  Unlock 20/day + CSV batch + cheat-sheet PDF
                 </button>
               </div>
             )}

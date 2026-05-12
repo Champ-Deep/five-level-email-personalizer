@@ -1,11 +1,13 @@
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import type { PersonalizeBody } from "@/lib/api";
 
 interface Props {
   prospect: PersonalizeBody["prospect"];
   sender: NonNullable<PersonalizeBody["sender"]>;
+  styleRules: string;
   setProspect: (p: PersonalizeBody["prospect"]) => void;
   setSender: (s: NonNullable<PersonalizeBody["sender"]>) => void;
+  setStyleRules: (s: string) => void;
   onSubmit: () => void;
   running: boolean;
   brandName: string;
@@ -16,7 +18,20 @@ const inputClass =
 
 const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider";
 
-export function PersonalizerForm({ prospect, sender, setProspect, setSender, onSubmit, running, brandName }: Props) {
+const BAKED_IN_RULES = [
+  "No em-dashes (—) or en-dashes (–) — use commas or periods",
+  "No 'not X, but Y' / 'it's not just X, it's Y' constructions",
+  "No AI-slop words: delve, leverage, navigate, landscape, tapestry, robust, holistic, seamless, supercharge, paradigm, transformative, cutting-edge…",
+  "No opener clichés ('hope this finds you', 'I noticed that you', 'quick question')",
+  "Plain prose, short sentences, concrete specifics over abstractions",
+];
+
+export function PersonalizerForm({
+  prospect, sender, styleRules,
+  setProspect, setSender, setStyleRules,
+  onSubmit, running, brandName,
+}: Props) {
+  const [styleOpen, setStyleOpen] = useState(false);
   const valid = prospect.name.trim() && prospect.title.trim() && prospect.domain.trim();
 
   const submit = (e: FormEvent) => {
@@ -33,22 +48,14 @@ export function PersonalizerForm({ prospect, sender, setProspect, setSender, onS
   const labelStyle = { color: "var(--brand-muted)" };
 
   return (
-    <form
-      onSubmit={submit}
-      className="space-y-5"
-      style={{ animation: "fadeUp .3s ease" }}
-    >
+    <form onSubmit={submit} className="space-y-5" style={{ animation: "fadeUp .3s ease" }}>
       <fieldset
         className="rounded-2xl border p-6"
         style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)" }}
       >
-        <legend
-          className="px-1 text-[10px] font-bold uppercase tracking-[0.15em]"
-          style={labelStyle}
-        >
+        <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.15em]" style={labelStyle}>
           Prospect Details
         </legend>
-
         <div className="mt-2 grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass} style={labelStyle}>Full Name <span style={{ color: "var(--brand-accent)" }}>*</span></label>
@@ -100,7 +107,6 @@ export function PersonalizerForm({ prospect, sender, setProspect, setSender, onS
         <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.15em]" style={labelStyle}>
           Sender Context · {brandName}
         </legend>
-
         <div className="mt-2 grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass} style={labelStyle}>Your Name</label>
@@ -133,6 +139,55 @@ export function PersonalizerForm({ prospect, sender, setProspect, setSender, onS
         </div>
       </fieldset>
 
+      <div
+        className="rounded-2xl border"
+        style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setStyleOpen(o => !o)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={labelStyle}>
+            Writing Style {styleRules.trim() && <span style={{ color: "var(--brand-accent)" }}>· custom rules added</span>}
+          </span>
+          <span style={{ color: "var(--brand-muted)", transform: styleOpen ? "rotate(180deg)" : undefined, transition: "transform .2s" }}>▾</span>
+        </button>
+        {styleOpen && (
+          <div className="border-t px-6 pb-5 pt-4" style={{ borderColor: "var(--brand-rule)" }}>
+            <div className="mb-3">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={labelStyle}>
+                Built-in rules (always on)
+              </div>
+              <ul className="space-y-1 text-xs leading-relaxed" style={{ color: "var(--brand-ink)" }}>
+                {BAKED_IN_RULES.map((r, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span style={{ color: "var(--brand-accent)" }}>✓</span>
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <label className={labelClass} style={labelStyle}>
+                Additional rules (your tone, banned words, voice notes…)
+              </label>
+              <textarea
+                rows={4}
+                className={inputClass}
+                style={{ ...inputStyle, resize: "vertical", fontFamily: "ui-monospace, SFMono-Regular, monospace", fontSize: 12 }}
+                placeholder={`e.g.\n- No exclamation marks\n- Open with a question about their last LinkedIn post\n- Tone: dry, witty, founder-to-founder\n- Banned: "circle back", "touch base"`}
+                value={styleRules}
+                onChange={e => setStyleRules(e.target.value)}
+              />
+              <p className="mt-1.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>
+                These rules are appended to the brand voice and the built-in anti-slop rules. They don't replace them.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       <button
         type="submit"
         disabled={!valid || running}
@@ -142,7 +197,7 @@ export function PersonalizerForm({ prospect, sender, setProspect, setSender, onS
           color: valid && !running ? "var(--brand-bg)" : "var(--brand-muted)",
         }}
       >
-        {running ? "Researching & generating…" : "Research prospect & generate 5 emails"}
+        {running ? "Researching & generating…" : "Research prospect & write the email"}
       </button>
 
       {!valid && (
