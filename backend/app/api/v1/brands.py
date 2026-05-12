@@ -14,6 +14,13 @@ async def list_brand_slugs() -> list[str]:
     return list_brands()
 
 
+@router.get("/_tone_presets", tags=["meta"])
+async def get_tone_presets() -> list[dict[str, str]]:
+    """Available tone presets for the `tone_preset` field on /v1/personalize."""
+    from app.levels.tone_presets import available_presets
+    return available_presets()
+
+
 @router.get("/{slug}", response_model=BrandConfig)
 async def get_brand(slug: str) -> BrandConfig:
     settings = get_settings()

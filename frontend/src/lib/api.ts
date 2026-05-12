@@ -68,12 +68,23 @@ export interface Brief {
   likely_pain_point: string;
 }
 
+export interface ScoreBlock {
+  score: number;
+  factors: Record<string, string>;
+}
+
+export interface EmailScores {
+  deliverability: ScoreBlock;
+  reply_likelihood: ScoreBlock;
+}
+
 export interface EmailDraft {
   subject: string;
   body: string;
   word_count: number;
   anchor_signal: string;
   warnings: string[];
+  scores?: EmailScores | null;
 }
 
 export interface Variation {
@@ -99,6 +110,7 @@ export interface PersonalizeBody {
   model?: string;
   system_prompt_override?: string | null;
   style_rules?: string | null;
+  tone_preset?: string | null;
 }
 
 export const api = {

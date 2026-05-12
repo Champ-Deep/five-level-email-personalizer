@@ -26,6 +26,7 @@ from app.services.brand_service import BrandConfig
 from app.services.llm.base import LLMError, LLMProvider
 from app.services.llm.openrouter import extract_json
 from app.services.research_service import research_prospect
+from app.services.scores import score_email
 
 
 WORD_RE = re.compile(r"\b[\w'-]+\b")
@@ -197,6 +198,14 @@ async def personalize(
     primary_level = max(request.levels) if request.levels else 5
     specs = _resolve_variations(request, brand)
 
+    # Compose tone preset (if any) into the style_rules channel — both
+    # caller-supplied rules and the tone preset are appended to the system
+    # prompt; neither replaces the brand voice or the hard anti-slop block.
+    from app.levels.tone_presets import compose_tone_rule
+
+    tone_rule = compose_tone_rule(request.tone_preset)
+    composed_style_rules = "\n\n".join(filter(None, [tone_rule, request.style_rules])) or None
+
     semaphore = asyncio.Semaphore(settings.max_concurrent_levels)
     tasks = [
         _generate_one(
@@ -208,7 +217,7 @@ async def personalize(
             model=spec.model,
             brand=brand,
             system_override=request.system_prompt_override,
-            style_rules=request.style_rules,
+            style_rules=composed_style_rules,
             semaphore=semaphore,
         )
         for spec in specs
@@ -227,6 +236,9 @@ async def personalize(
                 anchor_signal="",
                 warnings=[f"generation_error: {type(result).__name__}"],
             )
+        # Attach deliverability + reply-likelihood scores to every variation.
+        if not draft.subject.startswith("["):
+            draft.scores = score_email(draft, brief)
         variations.append(Variation(slot=spec.slot, label=spec.label or spec.model, model=spec.model, email=draft))
 
     # Back-compat: surface variation A under `emails[level]` for single-model callers.

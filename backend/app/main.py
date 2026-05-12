@@ -6,12 +6,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from app.api.v1 import api_keys as api_key_routes
 from app.api.v1 import auth as auth_routes
 from app.api.v1 import brands as brand_routes
 from app.api.v1 import jobs as job_routes
 from app.api.v1 import leads as lead_routes
 from app.api.v1 import personalize as personalize_routes
+from app.api.v1 import webhooks as webhook_routes
 from app.core.config import get_settings
+from app.core.middleware import RequestIdMiddleware
 from app.core.rate_limit import limiter
 from app.db.postgres import init_db, dispose_engine
 
@@ -60,12 +63,14 @@ def create_app() -> FastAPI:
         )
 
     app.add_middleware(SlowAPIMiddleware)
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_base_url],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
 
     app.include_router(personalize_routes.router, prefix="/v1")
@@ -73,6 +78,8 @@ def create_app() -> FastAPI:
     app.include_router(lead_routes.router, prefix="/v1")
     app.include_router(job_routes.router, prefix="/v1")
     app.include_router(auth_routes.router, prefix="/v1")
+    app.include_router(api_key_routes.router, prefix="/v1")
+    app.include_router(webhook_routes.router, prefix="/v1")
 
     @app.get("/health")
     async def health():

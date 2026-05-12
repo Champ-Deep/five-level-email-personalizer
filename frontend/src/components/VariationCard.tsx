@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Variation } from "@/lib/api";
 import { CopyBtn } from "./CopyBtn";
+import { ScoreChips } from "./ScoreChips";
 
 interface Props {
   variation: Variation;
@@ -88,6 +89,7 @@ export function VariationCard({ variation, senderName, picked, onPick }: Props) 
               >
                 {fullText}
               </pre>
+              <ScoreChips scores={email.scores} />
               <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: "var(--brand-muted)" }}>
                 <span>{email.word_count} words</span>
                 {email.anchor_signal && (

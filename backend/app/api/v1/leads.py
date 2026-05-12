@@ -9,6 +9,7 @@ from app.core.rate_limit import limiter
 from app.db.postgres import get_session
 from app.services.brand_service import BrandConfig
 from app.services.lead_service import upsert_lead
+from app.services.webhook_service import emit as emit_webhook
 
 from app.api.deps import resolve_brand
 
@@ -40,4 +41,22 @@ async def capture_lead(
         brand=brand.slug,
     )
     token = create_token(sub=str(lead.id), kind="lead", brand=brand.slug)
+
+    try:
+        await emit_webhook(
+            "lead.captured",
+            {
+                "lead_id": str(lead.id),
+                "email": lead.email,
+                "name": lead.name,
+                "brand": brand.slug,
+                "source": lead.source,
+                "request_id": getattr(request.state, "request_id", None),
+            },
+            brand=brand.slug,
+        )
+    except Exception as e:
+        import logging
+        logging.warning("Webhook emit failed for lead.captured: %s", e)
+
     return LeadResponse(token=token, lead_id=str(lead.id))

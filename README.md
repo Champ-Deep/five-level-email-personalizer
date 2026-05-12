@@ -22,13 +22,23 @@ docker compose up --build
 - Lead magnet (LakeB2B): <http://localhost:5173/lead-magnet/lakeb2b>
 - Internal app: <http://localhost:5173/app>
 
+## Integrating
+
+Three integration surfaces. Full reference at [`docs/api.md`](docs/api.md):
+
+1. **REST API** — `Bearer ck_live_…` auth, RFC-7807 errors, `Idempotency-Key` support, `X-Request-ID` echoed. See `docs/api.md` for the full contract.
+2. **Webhooks** — HMAC-SHA256 signed, 5-retry exponential backoff. Events: `personalize.completed`, `batch.queued`, `batch.prospect.completed`, `batch.completed`, `lead.captured`. Subscribe at `POST /v1/webhooks`.
+3. **Python SDK** — `pip install -e ./sdk`. `PersonalizerClient(...).personalize(...)` for HTTP, `LocalPersonalizer(...).run(...)` for in-process (ChampMail co-deploy).
+
+Every generated variation includes **deliverability** and **reply-likelihood** scores (0-100, with factor breakdown) so callers can gate sends instead of guessing. Tone presets (`casual`, `formal`, `founder`, `friendly`, `concise`) compose with per-call `style_rules` and the brand voice — none replaces another.
+
 ## Repo layout
 
 ```
-backend/    FastAPI service + arq worker + brand YAMLs + tests
+backend/    FastAPI service + arq worker (webhook delivery, batch) + brand YAMLs + tests
 frontend/   Vite + React + TS + Tailwind
 sdk/        champ-personalize Python package (HTTP + local clients)
-docs/       brand-onboarding, llm-tuning, integration-v2 guides
+docs/       api.md (REST + webhooks), brand-onboarding, llm-tuning, integration-v2
 ```
 
 See `/Users/deep/.claude/plans/users-deep-downloads-five-levels-cheat-spicy-glacier.md` for the full implementation plan and architecture rationale.

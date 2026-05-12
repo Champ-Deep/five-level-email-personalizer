@@ -26,6 +26,7 @@ export function LeadMagnetRoute() {
     name: "", company: "", offer: "",
   });
   const [styleRules, setStyleRules] = useState<string>("");
+  const [tonePreset, setTonePreset] = useState<string>("");
   const [response, setResponse] = useState<PersonalizeResponse | null>(null);
   const [pickedSlot, setPickedSlot] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -72,6 +73,7 @@ export function LeadMagnetRoute() {
         sender: { name: sender.name || "—", company: sender.company, offer: sender.offer },
         levels: [FUSED_LEVEL],
         ...(styleRules.trim() ? { style_rules: styleRules.trim() } : {}),
+        ...(tonePreset ? { tone_preset: tonePreset } : {}),
       };
       const result = await api.personalize(body, brand.slug);
       setResponse(result);
@@ -81,7 +83,7 @@ export function LeadMagnetRoute() {
     } finally {
       setRunning(false);
     }
-  }, [brand, canRunMore, prospect, sender, styleRules]);
+  }, [brand, canRunMore, prospect, sender, styleRules, tonePreset]);
 
   if (brandErr) return <div className="p-10 text-sm">Failed to load brand: {brandErr}</div>;
   if (!brand) return <div className="p-10 text-sm">Loading…</div>;
@@ -125,9 +127,11 @@ export function LeadMagnetRoute() {
             prospect={prospect}
             sender={sender}
             styleRules={styleRules}
+            tonePreset={tonePreset}
             setProspect={setProspect}
             setSender={setSender}
             setStyleRules={setStyleRules}
+            setTonePreset={setTonePreset}
             onSubmit={onSubmit}
             running={running}
             brandName={brand.name}

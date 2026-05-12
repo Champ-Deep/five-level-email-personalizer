@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import resolve_brand
@@ -18,8 +18,10 @@ from app.levels.schemas import (
     PersonalizeResponse,
 )
 from app.services.brand_service import BrandConfig
+from app.services.idempotency import find_record, save_record
 from app.services.llm.registry import get_provider
 from app.services.personalizer import personalize
+from app.services.webhook_service import emit as emit_webhook
 
 router = APIRouter(prefix="/personalize", tags=["personalize"])
 
@@ -31,13 +33,51 @@ async def personalize_endpoint(
     body: PersonalizeRequest,
     brand: BrandConfig = Depends(resolve_brand),
     subj: Optional[TokenSubject] = Depends(optional_subject),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    session: AsyncSession = Depends(get_session),
 ) -> PersonalizeResponse:
     request.state.subject = subj
+    api_key_id = subj.api_key_id if subj else None
+
+    # Idempotency: replay cached response if we've already processed this key.
+    if idempotency_key:
+        cached = await find_record(session, idem_key=idempotency_key, api_key_id=api_key_id)
+        if cached:
+            return PersonalizeResponse(**cached.response_payload)
+
     provider = get_provider(body.provider)
     try:
-        return await personalize(body, brand, provider)
+        result = await personalize(body, brand, provider)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e)) from e
+
+    if idempotency_key:
+        await save_record(
+            session,
+            idem_key=idempotency_key,
+            api_key_id=api_key_id,
+            status_code=200,
+            response_payload=json.loads(result.model_dump_json()),
+        )
+
+    # Emit webhook event (best-effort, fire-and-forget shape on the request path).
+    try:
+        await emit_webhook(
+            "personalize.completed",
+            {
+                "brand": result.brand,
+                "request_id": getattr(request.state, "request_id", None),
+                "prospect": body.prospect.model_dump(mode="json"),
+                "brief": result.brief.model_dump(mode="json"),
+                "variations": [v.model_dump(mode="json") for v in result.variations],
+            },
+            brand=result.brand,
+        )
+    except Exception as e:
+        import logging
+        logging.warning("Webhook emit failed for personalize.completed: %s", e)
+
+    return result
 
 
 @router.post("/batch", status_code=202)
@@ -88,4 +128,20 @@ async def personalize_batch(
         )
     finally:
         await pool.close()
+
+    try:
+        await emit_webhook(
+            "batch.queued",
+            {
+                "job_id": str(job.id),
+                "brand": brand.slug,
+                "total": job.total,
+                "request_id": getattr(request.state, "request_id", None),
+            },
+            brand=brand.slug,
+        )
+    except Exception as e:
+        import logging
+        logging.warning("Webhook emit failed for batch.queued: %s", e)
+
     return {"job_id": str(job.id)}

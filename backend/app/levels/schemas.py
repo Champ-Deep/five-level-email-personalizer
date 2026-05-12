@@ -38,6 +38,10 @@ class EmailDraft(BaseModel):
     word_count: int
     anchor_signal: str
     warnings: list[str] = Field(default_factory=list)
+    scores: Optional[dict] = Field(
+        default=None,
+        description="{deliverability: {score, factors}, reply_likelihood: {score, factors}}",
+    )
 
     def as_full_text(self, sender_name: str) -> str:
         return f"Subject: {self.subject}\n\n{self.body}\n\nBest,\n{sender_name}"
@@ -78,6 +82,10 @@ class PersonalizeRequest(BaseModel):
     style_rules: Optional[str] = Field(
         default=None,
         description="Free-text additional style rules from the caller. Appended to the brand voice; does NOT replace it.",
+    )
+    tone_preset: Optional[str] = Field(
+        default=None,
+        description="One of: casual, formal, founder, friendly, concise. Composed into style_rules.",
     )
 
 

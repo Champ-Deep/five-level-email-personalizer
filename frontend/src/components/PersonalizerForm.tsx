@@ -5,13 +5,24 @@ interface Props {
   prospect: PersonalizeBody["prospect"];
   sender: NonNullable<PersonalizeBody["sender"]>;
   styleRules: string;
+  tonePreset: string;
   setProspect: (p: PersonalizeBody["prospect"]) => void;
   setSender: (s: NonNullable<PersonalizeBody["sender"]>) => void;
   setStyleRules: (s: string) => void;
+  setTonePreset: (s: string) => void;
   onSubmit: () => void;
   running: boolean;
   brandName: string;
 }
+
+const TONE_PRESETS: Array<{ id: string; label: string; hint: string }> = [
+  { id: "",         label: "Default",   hint: "Brand voice only" },
+  { id: "casual",   label: "Casual",    hint: "Like a former coworker" },
+  { id: "formal",   label: "Formal",    hint: "Executive register" },
+  { id: "founder",  label: "Founder",   hint: "Dry, founder-to-founder" },
+  { id: "friendly", label: "Friendly",  hint: "Warm, peer-to-peer" },
+  { id: "concise",  label: "Concise",   hint: "55-75 words, every word does work" },
+];
 
 const inputClass =
   "w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2";
@@ -27,8 +38,8 @@ const BAKED_IN_RULES = [
 ];
 
 export function PersonalizerForm({
-  prospect, sender, styleRules,
-  setProspect, setSender, setStyleRules,
+  prospect, sender, styleRules, tonePreset,
+  setProspect, setSender, setStyleRules, setTonePreset,
   onSubmit, running, brandName,
 }: Props) {
   const [styleOpen, setStyleOpen] = useState(false);
@@ -139,6 +150,36 @@ export function PersonalizerForm({
         </div>
       </fieldset>
 
+      <fieldset
+        className="rounded-2xl border p-6"
+        style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)" }}
+      >
+        <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.15em]" style={labelStyle}>
+          Tone preset
+        </legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {TONE_PRESETS.map(p => {
+            const active = tonePreset === p.id;
+            return (
+              <button
+                key={p.id || "default"}
+                type="button"
+                onClick={() => setTonePreset(p.id)}
+                className="inline-flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left text-xs transition"
+                style={{
+                  background: active ? "var(--brand-accent)" : "var(--brand-bg)",
+                  borderColor: active ? "var(--brand-accent)" : "var(--brand-rule)",
+                  color: active ? "var(--brand-bg)" : "var(--brand-ink)",
+                }}
+              >
+                <span className="font-bold">{p.label}</span>
+                <span className="text-[10px]" style={{ opacity: 0.8 }}>{p.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
       <div
         className="rounded-2xl border"
         style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)" }}
@@ -149,7 +190,7 @@ export function PersonalizerForm({
           className="flex w-full items-center justify-between px-6 py-4 text-left"
         >
           <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={labelStyle}>
-            Writing Style {styleRules.trim() && <span style={{ color: "var(--brand-accent)" }}>· custom rules added</span>}
+            Custom style rules {styleRules.trim() && <span style={{ color: "var(--brand-accent)" }}>· added</span>}
           </span>
           <span style={{ color: "var(--brand-muted)", transform: styleOpen ? "rotate(180deg)" : undefined, transition: "transform .2s" }}>▾</span>
         </button>
