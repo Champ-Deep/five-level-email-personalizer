@@ -16,19 +16,24 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout: int = 120
-    openrouter_default_model: str = "anthropic/claude-sonnet-4.6"
+    # Default generation model. Open-weight by policy (Champions Group standard).
+    # Proprietary models (Anthropic, OpenAI) are only used by the eval harness
+    # as an external quality benchmark — never in the product path.
+    openrouter_default_model: str = "deepseek/deepseek-v4-pro"
+    # Research model. Perplexity Sonar is closed-source but is the only viable
+    # web-search-native option on OpenRouter today; flagged here as an exception.
     openrouter_research_model: str = "perplexity/sonar-pro"
     anthropic_api_key: str = ""
 
     # Three model slots for the variation pipeline. Each generates a full
     # 5-layer-fused email; the UI shows all 3 side-by-side so the user picks.
-    # Override per environment via .env.
-    variation_a_model: str = "anthropic/claude-sonnet-4.6"
-    variation_a_label: str = "Claude Sonnet 4.6"
-    variation_b_model: str = "deepseek/deepseek-v4-pro"
-    variation_b_label: str = "DeepSeek V4 Pro"
-    variation_c_model: str = "openai/gpt-4o"
-    variation_c_label: str = "GPT-4o"
+    # ALL THREE must be open-weight models. Override per environment via .env.
+    variation_a_model: str = "deepseek/deepseek-v4-pro"
+    variation_a_label: str = "DeepSeek V4 Pro"
+    variation_b_model: str = "meta-llama/llama-4-maverick"
+    variation_b_label: str = "Llama 4 Maverick"
+    variation_c_model: str = "mistralai/mistral-large-2512"
+    variation_c_label: str = "Mistral Large 3"
 
     # Storage
     database_url: str = "postgresql+asyncpg://personalizer:personalizer@localhost:5432/personalizer"

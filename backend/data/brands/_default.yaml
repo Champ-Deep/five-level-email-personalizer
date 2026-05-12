@@ -26,4 +26,4 @@ system_prompt_addendum: ""
 
 voice_keywords: []
 
-default_model: anthropic/claude-sonnet-4.6
+default_model: deepseek/deepseek-v4-pro

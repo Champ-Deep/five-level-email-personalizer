@@ -15,7 +15,7 @@ async def research_prospect(
     raw = await provider.chat_with_search(
         [{"role": "user", "content": prompt}],
         model=settings.openrouter_research_model,
-        max_tokens=2000,
+        max_tokens=4000,
         temperature=0.4,
         system=system_prompt(brand_addendum),
     )
@@ -29,7 +29,7 @@ async def research_prospect(
                 {"role": "user", "content": "Your previous response could not be parsed as JSON. Return ONLY the JSON object — no preamble, no code fences, no smart quotes, no trailing commas."},
             ],
             model=settings.openrouter_default_model,
-            max_tokens=2000,
+            max_tokens=4000,
             temperature=0.2,
             system=system_prompt(brand_addendum),
         )

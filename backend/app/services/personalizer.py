@@ -101,7 +101,7 @@ async def _generate_one(
         raw = await provider.chat(
             [{"role": "user", "content": prompt}],
             model=model,
-            max_tokens=3000,
+            max_tokens=6000,
             temperature=0.7,
             system=composed_system,
         )
@@ -144,7 +144,7 @@ async def _retry_strict(
                     {"role": "user", "content": correction},
                 ],
                 model=model,
-                max_tokens=3000,
+                max_tokens=6000,
                 temperature=0.4,
                 system=composed_system,
             )
