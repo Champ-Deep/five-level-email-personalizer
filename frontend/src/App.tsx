@@ -10,7 +10,7 @@ import { SettingsRoute } from "./routes/Settings";
 import { SignupRoute } from "./routes/Signup";
 import { WebhooksRoute } from "./routes/Webhooks";
 
-// LakeB2B branch — backend LOCKED_BRAND=lakeb2b enforces this server-side too.
+// LakeB2B branch. Backend LOCKED_BRAND=lakeb2b enforces this server-side too.
 const BRAND_SLUG = "lakeb2b";
 
 export default function App() {
