@@ -91,6 +91,23 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Friendly landing page for anyone who pokes the API URL directly.
+
+        The actual UI lives on the separate Frontend service. This just
+        confirms the API is alive and points the user at the docs.
+        """
+        return {
+            "service": "Five-Level Email Personalizer",
+            "version": "0.1.0",
+            "status": "ok",
+            "docs": "/docs",
+            "health": "/health",
+            "api_root": "/v1",
+            "note": "This is the API service. The user-facing app is the Frontend service.",
+        }
+
     return app
 
 
