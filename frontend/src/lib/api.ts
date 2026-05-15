@@ -1,3 +1,11 @@
+// Base URL prefix for all API calls. Empty string = same-origin (works
+// with the Vite dev proxy AND reverse-proxy production deploys). For
+// cross-origin deploys like Railway separate services, set
+// VITE_API_BASE_URL at build time, e.g. https://api.personalize.lakeb2b.com.
+const API_BASE: string = (
+  (import.meta as any).env?.VITE_API_BASE_URL ?? ""
+).replace(/\/$/, "");
+
 const TOKEN_KEY = "champ-personalize:token";
 
 export function getToken(): string | null {
@@ -19,7 +27,8 @@ async function request<T>(path: string, init: RequestInit & { brand?: string; au
     const t = getToken();
     if (t) headers["Authorization"] = `Bearer ${t}`;
   }
-  const res = await fetch(path, { ...init, headers });
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
     let detail: unknown;
     try { detail = await res.json(); } catch { detail = await res.text(); }

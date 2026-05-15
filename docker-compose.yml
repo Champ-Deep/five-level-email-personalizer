@@ -23,8 +23,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://personalizer:personalizer@postgres:5432/personalizer
       REDIS_URL: redis://redis:6379/0
@@ -42,8 +42,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://personalizer:personalizer@postgres:5432/personalizer
       REDIS_URL: redis://redis:6379/0
@@ -57,9 +57,14 @@ services:
       redis: { condition: service_healthy }
 
   frontend:
+    # Local dev: stop at the build stage (has node + deps) and run the
+    # Vite dev server with HMR. The production "runner" stage with `serve`
+    # is what Railway builds.
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: build
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     ports: ["5173:5173"]
     depends_on:
       - backend

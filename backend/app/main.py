@@ -64,9 +64,15 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    # FRONTEND_BASE_URL may be a single URL or comma-separated. Useful on
+    # Railway where typically you have <service>.up.railway.app plus a
+    # custom domain to allow.
+    allowed_origins = [
+        o.strip() for o in (settings.frontend_base_url or "").split(",") if o.strip()
+    ] or ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_base_url],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -22,6 +22,10 @@ docker compose up --build
 - Lead magnet (LakeB2B): <http://localhost:5173/lead-magnet/lakeb2b>
 - Internal app: <http://localhost:5173/app>
 
+## Deploying
+
+Railway is the supported production target. See [`docs/railway.md`](docs/railway.md) for the full step-by-step (Postgres + Redis plugins, API + Worker + Frontend services, env var table). The OpenRouter key variable is **`OPENROUTER_API_KEY`** — set on both the API service and the Worker service.
+
 ## Integrating
 
 Three integration surfaces. Full reference at [`docs/api.md`](docs/api.md):
