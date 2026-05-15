@@ -30,9 +30,12 @@ const inputClass =
 const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider";
 
 const BAKED_IN_RULES = [
-  "No em-dashes (—) or en-dashes (–) — use commas or periods",
+  // The em-dash character in this string is referenced as the banned glyph,
+  // not used as punctuation; we keep one literal example so users see what
+  // we're filtering for.
+  "No em-dashes or en-dashes. Use commas or periods.",
   "No 'not X, but Y' / 'it's not just X, it's Y' constructions",
-  "No AI-slop words: delve, leverage, navigate, landscape, tapestry, robust, holistic, seamless, supercharge, paradigm, transformative, cutting-edge…",
+  "No AI-slop words: delve, leverage, navigate, landscape, tapestry, robust, holistic, seamless, supercharge, paradigm, transformative, cutting-edge",
   "No opener clichés ('hope this finds you', 'I noticed that you', 'quick question')",
   "Plain prose, short sentences, concrete specifics over abstractions",
 ];
@@ -139,7 +142,7 @@ export function PersonalizerForm({
           </div>
         </div>
         <div className="mt-4">
-          <label className={labelClass} style={labelStyle}>What You're Offering (1–2 sentences)</label>
+          <label className={labelClass} style={labelStyle}>What You're Offering (1-2 sentences)</label>
           <textarea
             rows={2}
             className={inputClass}

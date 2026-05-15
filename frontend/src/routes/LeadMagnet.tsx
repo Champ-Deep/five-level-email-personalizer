@@ -70,7 +70,7 @@ export function LeadMagnetRoute() {
           domain: prospect.domain,
           ...(prospect.linkedin ? { linkedin: prospect.linkedin } : {}),
         },
-        sender: { name: sender.name || "—", company: sender.company, offer: sender.offer },
+        sender: { name: sender.name || brand.sender_default.name || brand.name, company: sender.company, offer: sender.offer },
         levels: [FUSED_LEVEL],
         ...(styleRules.trim() ? { style_rules: styleRules.trim() } : {}),
         ...(tonePreset ? { tone_preset: tonePreset } : {}),
@@ -117,7 +117,7 @@ export function LeadMagnetRoute() {
             className="mx-auto mt-4 max-w-xl text-base leading-relaxed"
             style={{ color: "var(--brand-muted)" }}
           >
-            Drop in a prospect. AI researches them live, then writes one cold email that fuses all five signal layers — industry, company, role, individual, and a synthesized POV.
+            Drop in a prospect. AI researches them live, then writes one cold email that fuses all five signal layers: industry, company, role, individual, and a synthesized POV.
             {brand.tagline && <strong style={{ color: "var(--brand-accent)" }}> · {brand.tagline}</strong>}
           </p>
         </section>

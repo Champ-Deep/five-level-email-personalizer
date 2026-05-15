@@ -48,7 +48,7 @@ export function LeadGate({ brand, brandName, onUnlocked, onClose }: Props) {
           Unlock 20 personalizations/day + CSV batch
         </h2>
         <p className="mb-5 text-sm leading-relaxed" style={{ color: "var(--brand-muted)" }}>
-          Tell us where to send the 5-Level cheat-sheet PDF — and you'll get 20 free runs per day plus the ability to upload a CSV from {brandName}.
+          Tell us where to send the 5-Level cheat-sheet PDF. You'll get 20 free runs per day plus the ability to upload a CSV from {brandName}.
         </p>
         <form onSubmit={submit} className="space-y-3">
           <input

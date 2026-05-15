@@ -17,7 +17,7 @@ tokens:
 sender_default:
   company: LakeB2B
   offer: >-
-    B2B data intelligence and demand generation — helping revenue teams find,
+    B2B data intelligence and demand generation that helps revenue teams find,
     reach, and convert their ideal buyers faster.
 
 system_prompt_addendum: |

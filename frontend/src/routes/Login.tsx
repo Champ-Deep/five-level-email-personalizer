@@ -38,7 +38,7 @@ export function LoginRoute() {
           {mode === "signup" ? "Create internal account" : "Sign in"}
         </h1>
         <p className="mb-5 text-xs" style={{ color: "var(--brand-muted)" }}>
-          Internal tool — for sales & marketing teams.
+          Internal tool for sales and marketing teams.
         </p>
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (

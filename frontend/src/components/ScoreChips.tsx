@@ -61,7 +61,7 @@ export function ScoreChips({ scores }: Props) {
             }}
           >
             {entries.length === 0 ? (
-              <em>Clean — no negative factors detected.</em>
+              <em>Clean. No negative factors detected.</em>
             ) : (
               <ul className="space-y-0.5">
                 {entries.map(([key, val]) => (

@@ -34,7 +34,7 @@ export function BriefPanel({ brief }: { brief: Brief | null }) {
               {k}
             </div>
             <div className="text-sm font-medium" style={{ color: "var(--brand-ink)" }}>
-              {v || "—"}
+              {v || "·"}
             </div>
           </div>
         ))}
