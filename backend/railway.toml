@@ -3,15 +3,18 @@
 #
 # This file describes the API service. The arq webhook+batch worker is a
 # SECOND Railway service that uses the SAME directory and Dockerfile but
-# overrides the start command — see docs/railway.md for the recipe.
+# overrides the start command. See docs/railway.md for the recipe.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+# Wrap in `sh -c` so $PORT actually expands. Railway runs startCommand
+# directly, not through a shell. Without the wrap uvicorn fails with
+# "Invalid value for '--port': '$PORT' is not a valid integer."
+startCommand = "sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 healthcheckPath = "/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

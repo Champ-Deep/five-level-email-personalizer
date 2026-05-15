@@ -4,7 +4,7 @@
 # Railway sees this railway.toml + the root Dockerfile and builds the API.
 #
 # The Worker service: clone this service in Railway, override the start
-# command to `arq app.workers.arq_worker.WorkerSettings`.
+# command to `sh -c 'arq app.workers.arq_worker.WorkerSettings'`.
 #
 # The Frontend service: separate Railway service, Root Directory = "frontend".
 # See docs/railway.md for the full multi-service recipe.
@@ -14,8 +14,15 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+# Railway executes startCommand directly (not through a shell), so $PORT
+# is NOT expanded by default. We wrap in `sh -c` to force shell expansion.
+# Without the wrap, uvicorn sees the literal string "$PORT" and refuses to
+# start with: `Error: Invalid value for '--port': '$PORT' is not a valid integer.`
+startCommand = "sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 healthcheckPath = "/health"
-healthcheckTimeout = 60
+# 300s gives the cold-boot uvicorn + sqlalchemy + slowapi stack room to
+# come up. Railway's default 100s can sometimes mark the deploy failed
+# before the app is ready.
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

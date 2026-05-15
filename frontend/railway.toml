@@ -2,17 +2,20 @@
 # Set Root Directory to "frontend" in the Railway service dashboard.
 #
 # Build args:
-#   VITE_API_BASE_URL — absolute URL of the backend service (e.g.
-#                       https://api.personalize.lakeb2b.com). Set as a
-#                       Railway service variable AND a build arg.
+#   VITE_API_BASE_URL — absolute URL of the backend API. Set as both a
+#                       Railway service variable AND a build arg. Baked
+#                       into the JS bundle at build time.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "serve -s dist -l $PORT"
+# `sh -c` wrap forces shell expansion of $PORT at runtime. Railway runs
+# startCommand directly, so without the wrap `serve -l $PORT` would
+# receive the literal string "$PORT" and crash.
+startCommand = "sh -c 'serve -s dist -l ${PORT:-5173}'"
 healthcheckPath = "/"
-healthcheckTimeout = 30
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
