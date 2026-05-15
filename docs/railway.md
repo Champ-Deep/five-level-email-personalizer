@@ -40,6 +40,17 @@ Set it as a **Service Variable** on the **API service** AND on the **Worker serv
 | **Postgres** | Railway plugin | — | — |
 | **Redis** | Railway plugin | — | — |
 
+## Why this Just Works on Railway
+
+The repo ships with both:
+
+- **Root** `Dockerfile` + `railway.toml` (the default — Railway sees these immediately, builds the API. Zero config needed.)
+- **Per-service** `backend/Dockerfile` + `backend/railway.toml` and `frontend/Dockerfile` + `frontend/railway.toml` (used when a service sets a Root Directory.)
+
+If you point a Railway service at the repo without setting Root Directory, it deploys the **API**. The Worker is a sibling service with one Start Command override. The Frontend is a separate service with Root Directory set to `frontend`.
+
+If you see Railway falling back to Railpack with "could not determine how to build the app", it means the root Dockerfile + railway.toml aren't visible — make sure the branch you're deploying has them (this branch does as of commit ${LAKEB2B_DEPLOY_COMMIT}).
+
 ## Step-by-step (first time)
 
 ### 1 · Provision plugins
@@ -49,27 +60,26 @@ In your Railway project: **+ New → Database → PostgreSQL**, then **+ New →
 - `${{Postgres.DATABASE_URL}}`
 - `${{Redis.REDIS_URL}}`
 
-### 2 · Deploy the API service
+### 2 · Deploy the API service (zero-config)
 
-1. **+ New → GitHub Repo → `Champ-Deep/five-level-email-personalizer`**
-2. Pick the branch (`lakeb2b` for the LakeB2B deploy, `span-global` for SPAN, `main` for the multi-brand demo).
-3. Open the service → **Settings → Source → Root Directory = `backend`**.
-4. Railway will detect `backend/railway.toml` and Dockerfile automatically.
-5. Set Service Variables (see table in §4).
-6. **Settings → Networking → Generate Domain**.
+1. **+ New → GitHub Repo → `Champ-Deep/lakeb2b-email-personalizer`** (or whichever repo you're using).
+2. Pick the branch (`main` on the standalone repo, or `lakeb2b`/`span-global`/`main` on the multi-brand repo).
+3. **Root Directory: leave as default (`.`)**. Railway will read `railway.toml` + `Dockerfile` from the root and build the API automatically.
+4. Set Service Variables (see table in §4).
+5. **Settings → Networking → Generate Domain**.
 
 ### 3 · Deploy the Worker service
 
-1. **+ New Service → GitHub Repo → same repo, same branch**.
-2. **Settings → Source → Root Directory = `backend`**.
-3. **Settings → Deploy → Start Command → `arq app.workers.arq_worker.WorkerSettings`** (overrides `railway.toml`).
+1. **+ New Service → same repo, same branch**.
+2. **Root Directory: leave as default (`.`)** — uses the same root Dockerfile.
+3. **Settings → Deploy → Start Command → `arq app.workers.arq_worker.WorkerSettings`** (overrides the railway.toml default).
 4. Disable the public domain (Worker is internal-only).
 5. Copy the SAME service variables as the API (`OPENROUTER_API_KEY`, `DATABASE_URL`, `REDIS_URL`, etc.).
 
 ### 4 · Deploy the Frontend service
 
 1. **+ New Service → same repo, same branch**.
-2. **Settings → Source → Root Directory = `frontend`**.
+2. **Settings → Source → Root Directory = `frontend`**. (This service is a separate Vite/static build, distinct from the backend.)
 3. **Settings → Build → Build Args**: `VITE_API_BASE_URL=https://<api-service>.up.railway.app` (use the URL from step 2's Generate Domain). This is baked into the bundle at build time.
 4. **Settings → Networking → Generate Domain**, or add your custom domain (`personalize.lakeb2b.com`).
 

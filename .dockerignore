@@ -1,0 +1,38 @@
+# Local dev artefacts — never ship to the image.
+.git
+.github
+.gitignore
+.env
+.env.local
+.env.*.local
+.venv
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Frontend (the root Dockerfile only builds the backend; frontend is its
+# own service with its own Dockerfile)
+frontend/
+sdk/
+
+# Local-only meta
+.claude/
+runs/
+docs/
+README.md
+docker-compose.yml
+
+# Build outputs
+**/dist/
+**/build/
+**/node_modules/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
