@@ -60,6 +60,33 @@ async def personalize_endpoint(
             response_payload=json.loads(result.model_dump_json()),
         )
 
+    # Persist run to history table for authenticated callers only.
+    # Anonymous lead-magnet runs are NOT stored (privacy + DB hygiene).
+    if subj is not None and subj.kind in ("user", "api_key"):
+        try:
+            from app.db.models import PersonalizationRun
+
+            run = PersonalizationRun(
+                owner_sub=subj.sub,
+                owner_kind=subj.kind,
+                brand=result.brand,
+                prospect_name=body.prospect.name,
+                prospect_title=body.prospect.title,
+                prospect_domain=body.prospect.domain,
+                sender_company=(body.sender.company if body.sender else None),
+                sender_name=(body.sender.name if body.sender else None),
+                tone_preset=body.tone_preset,
+                style_rules=body.style_rules,
+                request_payload=json.loads(body.model_dump_json()),
+                response_payload=json.loads(result.model_dump_json()),
+            )
+            session.add(run)
+            await session.commit()
+        except Exception as e:
+            import logging
+            logging.warning("Failed to persist personalization run to history: %s", e)
+            await session.rollback()
+
     # Emit webhook event (best-effort, fire-and-forget shape on the request path).
     try:
         await emit_webhook(

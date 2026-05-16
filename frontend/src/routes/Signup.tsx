@@ -2,19 +2,24 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, setToken } from "@/lib/api";
 
-export function LoginRoute() {
+export function SignupRoute() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 8) {
+      setErr("Password must be at least 8 characters");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      const res = await api.login(email, password);
+      const res = await api.signup(email, password, name || undefined);
       setToken(res.token);
       navigate("/app");
     } catch (e) {
@@ -38,12 +43,17 @@ export function LoginRoute() {
         style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)" }}
       >
         <h1 className="mb-1 font-brand-display text-xl font-extrabold" style={{ color: "var(--brand-ink)" }}>
-          Sign in
+          Create account
         </h1>
         <p className="mb-5 text-xs" style={{ color: "var(--brand-muted)" }}>
           Internal tool for sales and marketing teams.
         </p>
         <form onSubmit={submit} className="space-y-3">
+          <input
+            className={inputClass} style={inputStyle}
+            placeholder="Name (optional)" value={name}
+            onChange={e => setName(e.target.value)}
+          />
           <input
             type="email" required autoComplete="email"
             className={inputClass} style={inputStyle}
@@ -51,9 +61,9 @@ export function LoginRoute() {
             onChange={e => setEmail(e.target.value)}
           />
           <input
-            type="password" required autoComplete="current-password"
+            type="password" required minLength={8} autoComplete="new-password"
             className={inputClass} style={inputStyle}
-            placeholder="Password" value={password}
+            placeholder="Password (min 8 chars)" value={password}
             onChange={e => setPassword(e.target.value)}
           />
           {err && <div className="text-xs" style={{ color: "#dc2626" }}>{err}</div>}
@@ -62,12 +72,12 @@ export function LoginRoute() {
             className="w-full rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-60"
             style={{ background: "var(--brand-accent)", color: "var(--brand-bg)" }}
           >
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Creating account…" : "Create account"}
           </button>
         </form>
         <div className="mt-6 space-y-2 text-center text-xs">
-          <Link to="/signup" style={{ color: "var(--brand-accent)" }}>
-            Need an account? Sign up
+          <Link to="/login" style={{ color: "var(--brand-accent)" }}>
+            Already have an account? Sign in
           </Link>
           <div>
             <Link to="/lead-magnet/lakeb2b" style={{ color: "var(--brand-muted)" }}>

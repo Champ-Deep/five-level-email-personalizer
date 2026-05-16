@@ -1,3 +1,5 @@
+import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -12,10 +14,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 
+log = logging.getLogger(__name__)
+
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 bearer = HTTPBearer(auto_error=False)
 
 API_KEY_PREFIX = "ck_live_"
+# Redis key prefix for revoked-token blacklist. Stores SHA-256 of the JWT
+# so we never persist raw tokens; key TTL matches the token's remaining
+# TTL so Redis self-cleans.
+REVOKED_TOKEN_PREFIX = "revoked_jwt:"
 
 
 class TokenSubject(BaseModel):
@@ -23,6 +31,7 @@ class TokenSubject(BaseModel):
     kind: Literal["lead", "user", "api_key"]
     brand: Optional[str] = None
     api_key_id: Optional[str] = None
+    raw_token: Optional[str] = None  # populated by optional_subject for logout
 
 
 def hash_password(password: str) -> str:
@@ -52,6 +61,50 @@ def decode_token(token: str) -> TokenSubject:
         return TokenSubject(sub=data["sub"], kind=data["kind"], brand=data.get("brand"))
     except (JWTError, KeyError) as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from e
+
+
+def _token_fingerprint(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:32]
+
+
+async def _is_token_revoked(token: str) -> bool:
+    """Check the Redis blacklist. Silently returns False if Redis is unreachable
+    (degrade-to-allow rather than degrade-to-deny on infra blip).
+    """
+    try:
+        import redis.asyncio as redis_asyncio
+        r = redis_asyncio.from_url(get_settings().redis_url, decode_responses=True)
+        try:
+            return bool(await r.exists(REVOKED_TOKEN_PREFIX + _token_fingerprint(token)))
+        finally:
+            await r.aclose()
+    except Exception as e:
+        log.warning("Token revocation check skipped (Redis unreachable): %s", e)
+        return False
+
+
+async def revoke_token(token: str) -> None:
+    """Add a JWT fingerprint to the Redis blacklist for its remaining TTL."""
+    s = get_settings()
+    try:
+        data = jwt.decode(token, s.jwt_secret, algorithms=[s.jwt_algorithm])
+    except JWTError:
+        return  # already invalid
+    exp = data.get("exp")
+    if exp is None:
+        return
+    remaining = int(exp - datetime.now(timezone.utc).timestamp())
+    if remaining <= 0:
+        return
+    try:
+        import redis.asyncio as redis_asyncio
+        r = redis_asyncio.from_url(s.redis_url, decode_responses=True)
+        try:
+            await r.set(REVOKED_TOKEN_PREFIX + _token_fingerprint(token), "1", ex=remaining)
+        finally:
+            await r.aclose()
+    except Exception as e:
+        log.warning("Token revoke skipped (Redis unreachable): %s", e)
 
 
 def generate_api_key() -> tuple[str, str, str]:
@@ -102,9 +155,14 @@ async def optional_subject(
             subj = await _verify_api_key(token, session)
         if subj is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        subj.raw_token = token
         request.state.auth_subject = subj.sub
         return subj
+    # JWT path: verify signature + blacklist
     subj = decode_token(token)
+    if await _is_token_revoked(token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
+    subj.raw_token = token
     request.state.auth_subject = subj.sub
     return subj
 

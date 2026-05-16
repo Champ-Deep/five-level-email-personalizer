@@ -111,6 +111,50 @@ class WebhookDelivery(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PersonalizationRun(Base):
+    """Every successful /v1/personalize call by an authenticated caller.
+
+    Anonymous (no user/api-key) calls are NOT persisted.
+    Powers the /v1/history UI: browse / replay / track outcomes.
+    """
+    __tablename__ = "personalization_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Owner is either a user_id (for JWT auth) or an api_key_id (for API key auth).
+    # We store both as strings on `owner_sub` (mirrors TokenSubject.sub) for one-field indexing.
+    owner_sub: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    owner_kind: Mapped[str] = mapped_column(String(20), nullable=False)  # "user" | "api_key"
+    brand: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    prospect_name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    prospect_title: Mapped[str] = mapped_column(String(200), nullable=False)
+    prospect_domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    sender_company: Mapped[str | None] = mapped_column(String(200))
+    sender_name: Mapped[str | None] = mapped_column(String(200))
+    tone_preset: Mapped[str | None] = mapped_column(String(40))
+    style_rules: Mapped[str | None] = mapped_column(String(2000))
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    picked_slot: Mapped[str | None] = mapped_column(String(8))  # nullable; user can update later
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class SavedSender(Base):
+    """A user-saved sender/offer preset. Quick-pick instead of re-typing
+    "Deep at LakeB2B / data intelligence …" every personalization run.
+    """
+    __tablename__ = "saved_senders"
+    __table_args__ = (UniqueConstraint("owner_email", "label", name="uq_saved_sender_owner_label"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    company: Mapped[str] = mapped_column(String(200), nullable=False)
+    offer: Mapped[str] = mapped_column(String(1000), nullable=False)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class EvalRun(Base):
     __tablename__ = "eval_runs"
 

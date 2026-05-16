@@ -122,6 +122,79 @@ export interface PersonalizeBody {
   tone_preset?: string | null;
 }
 
+export interface UserMe {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  created_at: string;
+}
+
+export interface ApiKeyOut {
+  id: string;
+  name: string;
+  prefix: string;
+  brand: string | null;
+  rate_limit_per_day: number;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface CreateApiKeyResp extends ApiKeyOut { key: string }
+
+export interface WebhookOut {
+  id: string;
+  target_url: string;
+  events: string[];
+  brand: string | null;
+  active: boolean;
+  description: string | null;
+  created_at: string;
+}
+
+export interface CreateWebhookResp extends WebhookOut { secret: string }
+
+export interface WebhookDelivery {
+  id: string;
+  event_type: string;
+  status: string;
+  attempts: number;
+  response_status: number | null;
+  response_body: string | null;
+  created_at: string;
+  last_attempt_at: string | null;
+}
+
+export interface HistoryItem {
+  id: string;
+  brand: string;
+  prospect_name: string;
+  prospect_title: string;
+  prospect_domain: string;
+  sender_company: string | null;
+  sender_name: string | null;
+  tone_preset: string | null;
+  picked_slot: string | null;
+  created_at: string;
+}
+
+export interface HistoryDetail extends HistoryItem {
+  style_rules: string | null;
+  request_payload: Record<string, unknown>;
+  response_payload: PersonalizeResponse;
+}
+
+export interface SavedSender {
+  id: string;
+  label: string;
+  name: string;
+  company: string;
+  offer: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 export const api = {
   getBrand: (slug: string) => request<BrandConfig>(`/v1/brands/${slug}`, { auth: false }),
   listBrands: () => request<string[]>(`/v1/brands`, { auth: false }),
@@ -139,17 +212,25 @@ export const api = {
       auth: false,
     }),
   signup: (email: string, password: string, name?: string) =>
-    request<{ token: string; email: string }>(`/v1/auth/signup`, {
+    request<{ token: string; email: string; name: string | null }>(`/v1/auth/signup`, {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
       auth: false,
     }),
   login: (email: string, password: string) =>
-    request<{ token: string; email: string }>(`/v1/auth/login`, {
+    request<{ token: string; email: string; name: string | null }>(`/v1/auth/login`, {
       method: "POST",
       body: JSON.stringify({ email, password }),
       auth: false,
     }),
+  me: () => request<UserMe>(`/v1/auth/me`),
+  changePassword: (current_password: string, new_password: string) =>
+    request<void>(`/v1/auth/password`, {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
+  logout: () => request<void>(`/v1/auth/logout`, { method: "POST" }),
+
   batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][] }, brand: string) =>
     request<{ job_id: string }>(`/v1/personalize/batch`, {
       method: "POST",
@@ -167,4 +248,54 @@ export const api = {
       live: Record<string, unknown>;
       results: Record<number, PersonalizeResponse | { error: string }>;
     }>(`/v1/jobs/${jobId}`),
+
+  // API keys
+  listApiKeys: () => request<ApiKeyOut[]>(`/v1/api-keys`),
+  createApiKey: (name: string, opts?: { brand?: string; rate_limit_per_day?: number }) =>
+    request<CreateApiKeyResp>(`/v1/api-keys`, {
+      method: "POST",
+      body: JSON.stringify({ name, ...opts }),
+    }),
+  revokeApiKey: (id: string) => request<void>(`/v1/api-keys/${id}`, { method: "DELETE" }),
+
+  // Webhooks
+  listWebhooks: () => request<WebhookOut[]>(`/v1/webhooks`),
+  createWebhook: (
+    target_url: string,
+    events: string[],
+    description?: string,
+  ) => request<CreateWebhookResp>(`/v1/webhooks`, {
+    method: "POST",
+    body: JSON.stringify({ target_url, events, description }),
+  }),
+  revokeWebhook: (id: string) => request<void>(`/v1/webhooks/${id}`, { method: "DELETE" }),
+  listWebhookDeliveries: (id: string) => request<WebhookDelivery[]>(`/v1/webhooks/${id}/deliveries?limit=50`),
+
+  // History
+  listHistory: (params: { limit?: number; offset?: number; brand?: string; q?: string } = {}) => {
+    const sp = new URLSearchParams();
+    if (params.limit) sp.set("limit", String(params.limit));
+    if (params.offset) sp.set("offset", String(params.offset));
+    if (params.brand) sp.set("brand", params.brand);
+    if (params.q) sp.set("q", params.q);
+    const qs = sp.toString();
+    return request<{ items: HistoryItem[]; total: number; limit: number; offset: number }>(
+      `/v1/history${qs ? "?" + qs : ""}`,
+    );
+  },
+  getHistoryItem: (id: string) => request<HistoryDetail>(`/v1/history/${id}`),
+  pickHistoryVariation: (id: string, picked_slot: "A" | "B" | "C") =>
+    request<HistoryDetail>(`/v1/history/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ picked_slot }),
+    }),
+  deleteHistoryItem: (id: string) => request<void>(`/v1/history/${id}`, { method: "DELETE" }),
+
+  // Saved senders
+  listSenders: () => request<SavedSender[]>(`/v1/senders`),
+  createSender: (body: { label: string; name: string; company: string; offer: string; is_default?: boolean }) =>
+    request<SavedSender>(`/v1/senders`, { method: "POST", body: JSON.stringify(body) }),
+  updateSender: (id: string, body: { label: string; name: string; company: string; offer: string; is_default?: boolean }) =>
+    request<SavedSender>(`/v1/senders/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteSender: (id: string) => request<void>(`/v1/senders/${id}`, { method: "DELETE" }),
 };

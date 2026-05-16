@@ -36,15 +36,33 @@ export function LeadMagnetRoute() {
 
   useEffect(() => {
     let cancelled = false;
-    api.getBrand(slug).then(b => {
+    api.getBrand(slug).then(async b => {
       if (cancelled) return;
       setBrand(b);
       applyBrandTokens(b);
-      setSender(s => s.company ? s : ({
-        name: s.name,
-        company: b.sender_default.company,
-        offer: b.sender_default.offer,
-      }));
+
+      // If the user is signed in and has a default saved sender, prefer that.
+      let prefilledFromSaved = false;
+      if (getToken()) {
+        try {
+          const list = await api.listSenders();
+          if (cancelled) return;
+          const def = list.find(s => s.is_default) || list[0];
+          if (def) {
+            setSender({ name: def.name, company: def.company, offer: def.offer });
+            prefilledFromSaved = true;
+          }
+        } catch {
+          /* not signed in or other error — fall through */
+        }
+      }
+      if (!prefilledFromSaved) {
+        setSender(s => s.company ? s : ({
+          name: s.name,
+          company: b.sender_default.company,
+          offer: b.sender_default.offer,
+        }));
+      }
     }).catch(e => setBrandErr(String(e)));
     return () => { cancelled = true; };
   }, [slug]);
