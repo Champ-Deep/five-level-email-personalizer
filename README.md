@@ -1,14 +1,19 @@
-# Five-Level Email Personalizer
+# SPAN Global Services · 5-Level Email Personalizer
 
-White-labelable tool that productises the **Five Levels of Email Personalization** framework for the Champions Group ecosystem (LakeB2B, Ampliz, SPAN Global Services, Champions Group parent).
+Branded deployment of the Five Levels of Email Personalization framework for **SPAN Global Services**. Drop in any prospect — the system researches them live, fuses all five signal layers (Industry × Company × Role × Individual × Synthesis) into one cold email, and gives you three open-weight model-variant drafts (DeepSeek V4 Pro, Llama 4 Maverick, Mistral Large 3) to pick from.
 
-Ships as three surfaces backed by one service:
+**Brand:** SPAN Global Services · *Marketing Data Intelligence to Fuel Growth*
+**Identity:** SPAN Green `#1B6B3A` + Span Mint `#E8F5ED` · Montserrat (headings) + Inter (body)
+**Stat:** 25M+ verified business contacts across pharma, legal, energy, market research, and education.
 
-1. **Public lead-magnet** per brand domain — `personalize.lakeb2b.com`, `personalize.ampliz.com`, etc. Free: 1 prospect/IP/day. Signup unlocks 20/day + CSV batch.
-2. **Internal tool** at `/app` for sales/marketing teams — auth-gated, CSV upload, batch personalize, CSV/JSON export.
-3. **`champ-personalize` SDK** — pip-installable Python client + in-process adapter so ChampMail and ChampIQ can integrate later without code duplication.
+## What's locked to SPAN on this branch
 
-Every call goes through OpenRouter, so the underlying model is swappable per request (default: `anthropic/claude-sonnet-4.5`). An eval harness measures any candidate model against a frozen Claude baseline so you can validate ≥80–90% quality before swapping the default.
+- `LOCKED_BRAND=span-global` in `.env.example` — backend ignores Host / query / `X-Brand` and always serves SPAN's tokens, sender defaults, and voice addendum.
+- `/v1/brands` lists only `span-global`.
+- Frontend index hard-routes to `/lead-magnet/span-global`. The internal app drops the brand selector.
+- System-prompt addendum tuned for SPAN's voice: authoritative, precise, growth-oriented, global. Frames SPAN as a *data intelligence partner*, never a *data vendor*. Cites concrete scale (25M+ verified contacts).
+
+For the multi-brand version, see [`main`](https://github.com/Champ-Deep/five-level-email-personalizer/tree/main). The sister branch [`lakeb2b`](https://github.com/Champ-Deep/five-level-email-personalizer/tree/lakeb2b) is the LakeB2B build.
 
 ## Quick start
 
@@ -17,10 +22,9 @@ cp .env.example .env                # fill in OPENROUTER_API_KEY
 docker compose up --build
 ```
 
-- API: <http://localhost:8000> (Swagger at `/docs`)
-- Frontend: <http://localhost:5173>
-- Lead magnet (LakeB2B): <http://localhost:5173/lead-magnet/lakeb2b>
-- Internal app: <http://localhost:5173/app>
+- Lead magnet (SPAN): <http://localhost:5173>
+- Internal tool: <http://localhost:5173/app>
+- API docs: <http://localhost:8000/docs>
 
 ## Deploying
 
@@ -30,28 +34,23 @@ Railway is the supported production target. See [`docs/railway.md`](docs/railway
 
 Three integration surfaces. Full reference at [`docs/api.md`](docs/api.md):
 
-1. **REST API** — `Bearer ck_live_…` auth, RFC-7807 errors, `Idempotency-Key` support, `X-Request-ID` echoed. See `docs/api.md` for the full contract.
+1. **REST API** — `Bearer ck_live_…` auth, RFC-7807 errors, `Idempotency-Key` support, `X-Request-ID` echoed.
 2. **Webhooks** — HMAC-SHA256 signed, 5-retry exponential backoff. Events: `personalize.completed`, `batch.queued`, `batch.prospect.completed`, `batch.completed`, `lead.captured`. Subscribe at `POST /v1/webhooks`.
 3. **Python SDK** — `pip install -e ./sdk`. `PersonalizerClient(...).personalize(...)` for HTTP, `LocalPersonalizer(...).run(...)` for in-process (ChampMail co-deploy).
 
 Every generated variation includes **deliverability** and **reply-likelihood** scores (0-100, with factor breakdown) so callers can gate sends instead of guessing. Tone presets (`casual`, `formal`, `founder`, `friendly`, `concise`) compose with per-call `style_rules` and the brand voice — none replaces another.
 
-## Repo layout
+## How it ships
 
-```
-backend/    FastAPI service + arq worker (webhook delivery, batch) + brand YAMLs + tests
-frontend/   Vite + React + TS + Tailwind
-sdk/        champ-personalize Python package (HTTP + local clients)
-docs/       api.md (REST + webhooks), brand-onboarding, llm-tuning, integration-v2
-```
-
-See `/Users/deep/.claude/plans/users-deep-downloads-five-levels-cheat-spicy-glacier.md` for the full implementation plan and architecture rationale.
-
-## Adding a brand
-
-1. Drop a new `backend/data/brands/<slug>.yaml` with tokens + sender defaults.
-2. Visit `/lead-magnet/<slug>` — colors and copy update with zero code change.
-3. See `docs/brand-onboarding.md`.
+| Layer | Stack |
+|---|---|
+| Backend | FastAPI · SQLAlchemy[asyncio] · Postgres · Redis · `arq` worker (batch + webhook delivery) |
+| LLM | OpenRouter, **open-weight only**: DeepSeek V4 Pro / Llama 4 Maverick / Mistral Large 3 |
+| Research | Perplexity Sonar Pro (closed; only viable web-search-native option) |
+| Frontend | Vite · React · TypeScript · Tailwind |
+| Validator | Server-side gate: no em-dashes, no AI-slop vocab, no "not X but Y" |
+| Scoring | Deliverability + reply-likelihood heuristics on every output |
+| Eval | Pairwise blind judge via Claude Opus 4.1, `python -m app.eval_cli` |
 
 ## License
 
