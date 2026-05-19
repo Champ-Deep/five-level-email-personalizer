@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import resolve_brand
@@ -16,8 +16,10 @@ from app.levels.schemas import (
     BatchPersonalizeRequest,
     PersonalizeRequest,
     PersonalizeResponse,
+    ProspectInput,
 )
 from app.services.brand_service import BrandConfig
+from app.services.excel_service import parse_excel
 from app.services.idempotency import find_record, save_record
 from app.services.llm.registry import get_provider
 from app.services.personalizer import personalize
@@ -172,3 +174,111 @@ async def personalize_batch(
         logging.warning("Webhook emit failed for batch.queued: %s", e)
 
     return {"job_id": str(job.id)}
+
+
+@router.post("/excel", status_code=202)
+async def personalize_excel(
+    request: Request,
+    file: UploadFile = File(..., description="Upload an .xlsx workbook. First sheet must have columns: name, title, domain (linkedin + email optional)."),
+    sender_name: str = Form(...),
+    sender_company: str = Form(...),
+    sender_offer: str = Form(...),
+    include_followup: bool = Form(False),
+    tone_preset: Optional[str] = Form(None),
+    style_rules: Optional[str] = Form(None),
+    brand: BrandConfig = Depends(resolve_brand),
+    subj: Optional[TokenSubject] = Depends(optional_subject),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    """Multipart Excel upload → queued batch job. Original workbook is
+    stashed on the Job row so /v1/jobs/{id}/export?format=xlsx can return
+    the same workbook with personalized columns appended.
+    """
+    if subj is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sign up or sign in to upload an Excel batch.",
+        )
+    if not (file.filename or "").lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Upload must be an .xlsx file")
+
+    raw = await file.read()
+    if len(raw) > 25_000_000:
+        raise HTTPException(status_code=413, detail="Excel file too large (max 25 MB)")
+    try:
+        prospects = parse_excel(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not prospects:
+        raise HTTPException(status_code=400, detail="No valid rows found in the sheet.")
+    if len(prospects) > 1000:
+        raise HTTPException(status_code=413, detail="Batch limit is 1000 prospects.")
+
+    from app.levels.schemas import SenderInput as _SI
+    body = BatchPersonalizeRequest(
+        prospects=prospects,
+        sender=_SI(name=sender_name, company=sender_company, offer=sender_offer),
+        levels=[5],
+        include_followup=include_followup,
+        tone_preset=tone_preset,
+        style_rules=style_rules,
+    )
+
+    job = Job(
+        id=uuid.uuid4(),
+        owner_email=subj.sub,
+        brand=brand.slug,
+        status="pending",
+        total=len(body.prospects),
+        done=0,
+        failed_count=0,
+        request_payload=json.loads(body.model_dump_json()),
+        source_filename=file.filename,
+    )
+    session.add(job)
+    await session.commit()
+
+    from arq import create_pool
+    from arq.connections import RedisSettings
+    from app.core.config import get_settings
+    import redis.asyncio as redis_asyncio
+
+    redis_url = get_settings().redis_url
+
+    # Stash original Excel bytes in Redis with 7-day TTL so /export can rebuild
+    # the user's workbook with personalized columns appended.
+    r = redis_asyncio.from_url(redis_url)
+    try:
+        await r.set(f"job:{str(job.id)}:source_excel", raw, ex=60 * 60 * 24 * 7)
+    finally:
+        await r.aclose()
+
+    pool = await create_pool(RedisSettings.from_dsn(redis_url))
+    try:
+        await pool.enqueue_job(
+            "batch_personalize_task",
+            str(job.id),
+            brand.slug,
+            json.loads(body.model_dump_json()),
+        )
+    finally:
+        await pool.close()
+
+    try:
+        await emit_webhook(
+            "batch.queued",
+            {
+                "job_id": str(job.id),
+                "brand": brand.slug,
+                "total": job.total,
+                "source": "excel",
+                "filename": file.filename,
+                "request_id": getattr(request.state, "request_id", None),
+            },
+            brand=brand.slug,
+        )
+    except Exception as e:
+        import logging
+        logging.warning("Webhook emit failed for batch.queued (excel): %s", e)
+
+    return {"job_id": str(job.id), "total": str(job.total), "include_followup": str(include_followup)}

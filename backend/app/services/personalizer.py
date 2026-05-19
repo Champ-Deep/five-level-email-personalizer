@@ -25,6 +25,7 @@ from app.levels.schemas import (
 from app.services.brand_service import BrandConfig
 from app.services.llm.base import LLMError, LLMProvider
 from app.services.llm.openrouter import extract_json
+from app.levels.followup_prompts import followup_prompt
 from app.services.research_service import research_prospect
 from app.services.scores import score_email
 
@@ -241,6 +242,46 @@ async def personalize(
             draft.scores = score_email(draft, brief)
         variations.append(Variation(slot=spec.slot, label=spec.label or spec.model, model=spec.model, email=draft))
 
+    # Optional follow-up generation: one extra LLM call per successful variation,
+    # using the same model the initial used. Runs in parallel across variations.
+    if request.include_followup and variations:
+        async def _gen_followup(v: Variation) -> tuple[str, EmailDraft | None]:
+            if v.email.subject.startswith("[") or not v.email.body:
+                return v.slot, None
+            prompt = followup_prompt(brief, sender, v.email)
+            try:
+                async with semaphore:
+                    raw = await provider.chat(
+                        [{"role": "user", "content": prompt}],
+                        model=v.model,
+                        max_tokens=6000,
+                        temperature=0.7,
+                        system=system_prompt(brand.system_prompt_addendum, composed_style_rules),
+                    )
+                data = _normalize_email_keys(extract_json(raw))
+                f_draft = EmailDraft(
+                    subject=str(data.get("subject", "")).strip(),
+                    body=str(data.get("body", "")).strip(),
+                    word_count=int(data.get("word_count") or _count_words(data.get("body", ""))),
+                    anchor_signal=str(data.get("anchor_signal", "")).strip(),
+                )
+                f_warnings = _validate(f_draft)
+                if f_warnings:
+                    f_draft.warnings = f_warnings
+                f_draft.scores = score_email(f_draft, brief)
+                return v.slot, f_draft
+            except Exception as e:
+                return v.slot, EmailDraft(
+                    subject=f"[Follow-up {v.slot} failed]",
+                    body=str(e), word_count=0, anchor_signal="",
+                    warnings=[f"followup_error: {type(e).__name__}"],
+                )
+
+        followups = await asyncio.gather(*[_gen_followup(v) for v in variations], return_exceptions=False)
+        followup_by_slot = {slot: draft for slot, draft in followups}
+        for v in variations:
+            v.followup = followup_by_slot.get(v.slot)
+
     # Back-compat: surface variation A under `emails[level]` for single-model callers.
     emails: dict[int, EmailDraft] = {}
     if variations:
@@ -259,15 +300,21 @@ async def personalize_one(
     model: Optional[str] = None,
     system_prompt_override: Optional[str] = None,
     style_rules: Optional[str] = None,
+    tone_preset: Optional[str] = None,
+    include_followup: bool = False,
+    variations: Optional[list] = None,
 ) -> PersonalizeResponse:
     """Convenience entrypoint for SDK / worker callers."""
     request = PersonalizeRequest(
         prospect=prospect,
         sender=sender,
-        levels=levels or [1, 2, 3, 4, 5],
+        levels=levels or [5],
         provider=provider.name,
         model=model,
         system_prompt_override=system_prompt_override,
         style_rules=style_rules,
+        tone_preset=tone_preset,
+        include_followup=include_followup,
+        variations=variations,
     )
     return await personalize(request, brand, provider)

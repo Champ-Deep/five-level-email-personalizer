@@ -46,6 +46,10 @@ class Job(Base):
     done: Mapped[int] = mapped_column(default=0)
     failed_count: Mapped[int] = mapped_column(default=0)
     request_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # When the user uploaded an Excel file, we stash the filename here and
+    # the bytes in Redis (key `job:{id}:source_excel`, 7-day TTL). Keeping
+    # binary blobs out of Postgres is a deliberate choice.
+    source_filename: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -108,6 +112,24 @@ class WebhookDelivery(Base):
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     response_status: Mapped[int | None] = mapped_column()
     response_body: Mapped[str | None] = mapped_column(String(4000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IntegrationCredential(Base):
+    """Stored credentials for a third-party connector (Instantly, ChampMail,
+    ChampIQ webhook target, etc.). Sensitive values inside `config` are
+    Fernet-encrypted at rest using a key derived from JWT_SECRET.
+    """
+    __tablename__ = "integration_credentials"
+    __table_args__ = (UniqueConstraint("owner_email", "provider", "label", name="uq_integration_owner_provider_label"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # "instantly" | "champmail" | "champiq"
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    config_encrypted: Mapped[str] = mapped_column(String(4000), nullable=False)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

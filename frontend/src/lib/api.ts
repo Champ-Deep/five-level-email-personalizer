@@ -101,6 +101,7 @@ export interface Variation {
   label: string;
   model: string;
   email: EmailDraft;
+  followup?: EmailDraft | null;
 }
 
 export interface PersonalizeResponse {
@@ -195,6 +196,30 @@ export interface SavedSender {
   created_at: string;
 }
 
+export interface IntegrationProvider {
+  provider: string;
+  label: string;
+  required: string[];
+}
+
+export interface IntegrationOut {
+  id: string;
+  provider: string;
+  label: string;
+  is_default: boolean;
+  last_used_at: string | null;
+  created_at: string;
+  config_preview: Record<string, string>;
+}
+
+export interface PushResult {
+  ok: boolean;
+  pushed: number;
+  failed: number;
+  errors: string[];
+  provider: string;
+}
+
 export const api = {
   getBrand: (slug: string) => request<BrandConfig>(`/v1/brands/${slug}`, { auth: false }),
   listBrands: () => request<string[]>(`/v1/brands`, { auth: false }),
@@ -231,12 +256,41 @@ export const api = {
     }),
   logout: () => request<void>(`/v1/auth/logout`, { method: "POST" }),
 
-  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][] }, brand: string) =>
+  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup?: boolean }, brand: string) =>
     request<{ job_id: string }>(`/v1/personalize/batch`, {
       method: "POST",
       body: JSON.stringify(body),
       brand,
     }),
+  // Excel multipart upload (server parses headers, no client-side xlsx lib needed).
+  batchExcel: async (
+    file: File,
+    sender: { name: string; company: string; offer: string },
+    opts: { brand: string; include_followup?: boolean; tone_preset?: string; style_rules?: string },
+  ): Promise<{ job_id: string; total: number; include_followup: boolean }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("sender_name", sender.name);
+    fd.append("sender_company", sender.company);
+    fd.append("sender_offer", sender.offer);
+    if (opts.include_followup) fd.append("include_followup", "true");
+    if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
+    if (opts.style_rules) fd.append("style_rules", opts.style_rules);
+    const headers: Record<string, string> = { "X-Brand": opts.brand };
+    const t = getToken();
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+    const res = await fetch(`/v1/personalize/excel`, { method: "POST", body: fd, headers });
+    if (!res.ok) {
+      let d: unknown;
+      try { d = await res.json(); } catch { d = await res.text(); }
+      const msg = typeof d === "object" && d && "detail" in (d as object)
+        ? String((d as Record<string, unknown>).detail)
+        : `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    const j = await res.json();
+    return { job_id: j.job_id, total: Number(j.total || 0), include_followup: j.include_followup === "True" };
+  },
   getJob: (jobId: string) =>
     request<{
       job_id: string;
@@ -247,7 +301,25 @@ export const api = {
       failed_count: number;
       live: Record<string, unknown>;
       results: Record<number, PersonalizeResponse | { error: string }>;
+      has_source_excel: boolean;
+      source_filename: string | null;
     }>(`/v1/jobs/${jobId}`),
+  // Trigger a file download; returns the blob URL for the caller to use in an <a> click.
+  exportJob: async (jobId: string, opts: { format?: "xlsx" | "csv"; pick?: "A" | "B" | "C" | "auto" } = {}) => {
+    const sp = new URLSearchParams();
+    sp.set("format", opts.format || "xlsx");
+    sp.set("pick", opts.pick || "auto");
+    const headers: Record<string, string> = {};
+    const t = getToken();
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+    const res = await fetch(`/v1/jobs/${jobId}/export?${sp.toString()}`, { headers });
+    if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
+    const blob = await res.blob();
+    const disp = res.headers.get("Content-Disposition") || "";
+    const m = /filename="([^"]+)"/.exec(disp);
+    const filename = m ? m[1] : `export-${jobId}.${opts.format || "xlsx"}`;
+    return { blob, filename };
+  },
 
   // API keys
   listApiKeys: () => request<ApiKeyOut[]>(`/v1/api-keys`),
@@ -298,4 +370,22 @@ export const api = {
   updateSender: (id: string, body: { label: string; name: string; company: string; offer: string; is_default?: boolean }) =>
     request<SavedSender>(`/v1/senders/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteSender: (id: string) => request<void>(`/v1/senders/${id}`, { method: "DELETE" }),
+
+  // Integrations
+  listIntegrationProviders: () => request<IntegrationProvider[]>(`/v1/integrations/providers`),
+  listIntegrations: () => request<IntegrationOut[]>(`/v1/integrations`),
+  createIntegration: (provider: string, label: string, config: Record<string, string>, is_default = false) =>
+    request<IntegrationOut>(`/v1/integrations`, {
+      method: "POST",
+      body: JSON.stringify({ provider, label, config, is_default }),
+    }),
+  updateIntegration: (id: string, body: { label?: string; config?: Record<string, string>; is_default?: boolean }) =>
+    request<IntegrationOut>(`/v1/integrations/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteIntegration: (id: string) => request<void>(`/v1/integrations/${id}`, { method: "DELETE" }),
+  healthcheckIntegration: (id: string) => request<{ ok: boolean; message: string }>(`/v1/integrations/${id}/healthcheck`, { method: "POST" }),
+  pushJobToIntegration: (jobId: string, integrationId: string, pick: "auto" | "A" | "B" | "C" = "auto") =>
+    request<PushResult>(`/v1/jobs/${jobId}/push`, {
+      method: "POST",
+      body: JSON.stringify({ integration_id: integrationId, pick }),
+    }),
 };

@@ -63,6 +63,10 @@ class Variation(BaseModel):
     label: str
     model: str
     email: EmailDraft
+    followup: Optional[EmailDraft] = Field(
+        default=None,
+        description="Optional follow-up email, generated when include_followup=true on the request.",
+    )
 
 
 class PersonalizeRequest(BaseModel):
@@ -87,6 +91,10 @@ class PersonalizeRequest(BaseModel):
         default=None,
         description="One of: casual, formal, founder, friendly, concise. Composed into style_rules.",
     )
+    include_followup: bool = Field(
+        default=False,
+        description="Generate a follow-up email per variation (additional LLM call per variation).",
+    )
 
 
 class PersonalizeResponse(BaseModel):
@@ -107,3 +115,5 @@ class BatchPersonalizeRequest(BaseModel):
     variations: Optional[list[VariationSpec]] = None
     system_prompt_override: Optional[str] = None
     style_rules: Optional[str] = None
+    tone_preset: Optional[str] = None
+    include_followup: bool = False

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ApiKeysRoute } from "./routes/ApiKeys";
 import { HistoryRoute } from "./routes/History";
+import { IntegrationsRoute } from "./routes/Integrations";
 import { InternalAppRoute } from "./routes/InternalApp";
 import { LeadMagnetRoute } from "./routes/LeadMagnet";
 import { LoginRoute } from "./routes/Login";
@@ -20,6 +21,7 @@ export default function App() {
       <Route path="/app" element={<InternalAppRoute />} />
       <Route path="/app/history" element={<HistoryRoute />} />
       <Route path="/app/senders" element={<SendersRoute />} />
+      <Route path="/app/integrations" element={<IntegrationsRoute />} />
       <Route path="/app/api-keys" element={<ApiKeysRoute />} />
       <Route path="/app/webhooks" element={<WebhooksRoute />} />
       <Route path="/app/settings" element={<SettingsRoute />} />

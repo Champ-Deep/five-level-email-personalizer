@@ -10,6 +10,7 @@ from app.api.v1 import api_keys as api_key_routes
 from app.api.v1 import auth as auth_routes
 from app.api.v1 import brands as brand_routes
 from app.api.v1 import history as history_routes
+from app.api.v1 import integrations as integration_routes
 from app.api.v1 import jobs as job_routes
 from app.api.v1 import leads as lead_routes
 from app.api.v1 import personalize as personalize_routes
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_routes.router, prefix="/v1")
     app.include_router(history_routes.router, prefix="/v1")
     app.include_router(sender_routes.router, prefix="/v1")
+    app.include_router(integration_routes.router, prefix="/v1")
 
     @app.get("/health")
     async def health():
