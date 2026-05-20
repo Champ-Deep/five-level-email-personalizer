@@ -287,7 +287,24 @@ async def personalize(
     if variations:
         emails[primary_level] = variations[0].email
 
-    return PersonalizeResponse(brand=brand.slug, brief=brief, variations=variations, emails=emails)
+    # ICP fit (optional, opportunistic). Uses an ad-hoc description if provided;
+    # the API layer resolves profile_id → description before calling personalize().
+    icp_fit = None
+    icp_desc = getattr(request, "icp_description", None)
+    if icp_desc:
+        try:
+            from app.services.icp_scorer import score_icp_fit
+            r = await score_icp_fit(
+                request.prospect, icp_desc, provider,
+                model="meta-llama/llama-4-maverick", brief=brief,
+            )
+            from app.levels.schemas import IcpFit
+            icp_fit = IcpFit(score=r["score"], reason=r["reason"], profile_id=getattr(request, "icp_profile_id", None))
+        except Exception as e:
+            import logging
+            logging.warning("ICP scoring failed: %s", e)
+
+    return PersonalizeResponse(brand=brand.slug, brief=brief, variations=variations, icp_fit=icp_fit, emails=emails)
 
 
 async def personalize_one(

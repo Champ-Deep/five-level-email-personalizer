@@ -2,13 +2,16 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ApiKeysRoute } from "./routes/ApiKeys";
 import { HistoryRoute } from "./routes/History";
+import { IcpProfilesRoute } from "./routes/IcpProfiles";
 import { IntegrationsRoute } from "./routes/Integrations";
 import { InternalAppRoute } from "./routes/InternalApp";
 import { LeadMagnetRoute } from "./routes/LeadMagnet";
 import { LoginRoute } from "./routes/Login";
+import { RepliesRoute } from "./routes/Replies";
 import { SendersRoute } from "./routes/Senders";
 import { SettingsRoute } from "./routes/Settings";
 import { SignupRoute } from "./routes/Signup";
+import { SuppressionsRoute } from "./routes/Suppressions";
 import { WebhooksRoute } from "./routes/Webhooks";
 
 export default function App() {
@@ -21,6 +24,9 @@ export default function App() {
       <Route path="/app" element={<InternalAppRoute />} />
       <Route path="/app/history" element={<HistoryRoute />} />
       <Route path="/app/senders" element={<SendersRoute />} />
+      <Route path="/app/icp" element={<IcpProfilesRoute />} />
+      <Route path="/app/suppressions" element={<SuppressionsRoute />} />
+      <Route path="/app/replies" element={<RepliesRoute />} />
       <Route path="/app/integrations" element={<IntegrationsRoute />} />
       <Route path="/app/api-keys" element={<ApiKeysRoute />} />
       <Route path="/app/webhooks" element={<WebhooksRoute />} />

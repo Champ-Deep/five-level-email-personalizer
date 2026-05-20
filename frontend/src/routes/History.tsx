@@ -35,11 +35,25 @@ export function HistoryRoute() {
 
   const pick = async (slot: "A" | "B" | "C") => {
     if (!detail) return;
-    const updated = await api.pickHistoryVariation(detail.id, slot);
+    const updated = await api.patchHistoryRun(detail.id, { picked_slot: slot });
     setDetail(updated);
     setPickedSlot(slot);
     // Update the list row too
     setItems(items.map(i => i.id === detail.id ? { ...i, picked_slot: slot } : i));
+  };
+
+  // Save inline edits to subject/body. Edits only ever apply to the picked slot
+  // (matches what gets exported), so saving auto-picks the slot if nothing is
+  // picked yet.
+  const saveEditsFor = async (slot: "A" | "B" | "C", subject: string | null, body: string | null) => {
+    if (!detail) return;
+    const updated = await api.patchHistoryRun(detail.id, {
+      picked_slot: (pickedSlot as "A" | "B" | "C" | null) ?? slot,
+      edited_subject: subject,
+      edited_body: body,
+    });
+    setDetail(updated);
+    setPickedSlot(updated.picked_slot);
   };
 
   const remove = async (id: string) => {
@@ -106,15 +120,26 @@ export function HistoryRoute() {
                 <div className="space-y-4 border-t p-4" style={{ borderColor: "var(--brand-rule)" }}>
                   <BriefPanel brief={detail.response_payload.brief} />
                   <div className="space-y-3">
-                    {(detail.response_payload.variations || []).map(v => (
-                      <VariationCard
-                        key={v.slot}
-                        variation={v}
-                        senderName={senderName}
-                        picked={pickedSlot === v.slot}
-                        onPick={() => pick(v.slot as "A" | "B" | "C")}
-                      />
-                    ))}
+                    {(detail.response_payload.variations || []).map(v => {
+                      const isPicked = pickedSlot === v.slot;
+                      // Server-stored edits only apply to the picked slot —
+                      // surface them on that card so the user can revert / re-edit.
+                      const editedSubject = isPicked ? detail.edited_subject ?? null : null;
+                      const editedBody = isPicked ? detail.edited_body ?? null : null;
+                      return (
+                        <VariationCard
+                          key={v.slot}
+                          variation={v}
+                          senderName={senderName}
+                          picked={isPicked}
+                          onPick={() => pick(v.slot as "A" | "B" | "C")}
+                          editable
+                          editedSubject={editedSubject}
+                          editedBody={editedBody}
+                          onSaveEdits={(subject, body) => saveEditsFor(v.slot as "A" | "B" | "C", subject, body)}
+                        />
+                      );
+                    })}
                   </div>
                   <div className="flex justify-end">
                     <button onClick={() => remove(detail.id)} className="text-xs font-semibold" style={{ color: "#dc2626" }}>

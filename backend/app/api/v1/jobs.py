@@ -197,6 +197,74 @@ async def export_job(
     )
 
 
+@router.post("/{job_id}/regenerate/{prospect_index}")
+async def regenerate_one_row(
+    job_id: str,
+    prospect_index: int,
+    payload: dict[str, Any] | None = None,
+    subj: TokenSubject = Depends(require_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Re-run /v1/personalize for a single prospect in this batch.
+
+    Body (all optional):
+      { "tone_preset": "...", "style_rules": "...", "include_followup": bool, "model": "..." }
+
+    Updates the cached pipeline result so the next GET /v1/jobs/{id}
+    surfaces the new variations for that row.
+    """
+    payload = payload or {}
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid job id") from e
+    job = (await session.execute(select(Job).where(Job.id == jid))).scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.owner_email and subj.sub != job.owner_email:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    prospects = (job.request_payload or {}).get("prospects") or []
+    if prospect_index < 0 or prospect_index >= len(prospects):
+        raise HTTPException(status_code=400, detail=f"prospect_index out of range (0..{len(prospects)-1})")
+
+    from app.levels.schemas import PersonalizeRequest, ProspectInput, SenderInput
+    from app.services.brand_service import load_brand
+    from app.services.llm.registry import get_provider
+    from app.services.personalizer import personalize
+
+    sender_dict = (job.request_payload or {}).get("sender") or {}
+    sender_obj = SenderInput(**sender_dict) if sender_dict else None
+    base = (job.request_payload or {})
+    req = PersonalizeRequest(
+        prospect=ProspectInput(**prospects[prospect_index]),
+        sender=sender_obj,
+        levels=[5],
+        provider="openrouter",
+        tone_preset=payload.get("tone_preset") or base.get("tone_preset"),
+        style_rules=payload.get("style_rules") or base.get("style_rules"),
+        include_followup=bool(payload.get("include_followup", base.get("include_followup", False))),
+        model=payload.get("model"),
+    )
+    brand_cfg = load_brand(job.brand)
+    provider = get_provider("openrouter")
+    try:
+        result = await personalize(req, brand_cfg, provider)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Regenerate failed: {e}") from e
+
+    r = redis_asyncio.from_url(get_settings().redis_url, decode_responses=True)
+    try:
+        await r.set(
+            f"pipeline:{job_id}:results:{prospect_index}",
+            result.model_dump_json(),
+            ex=60 * 60 * 24 * 7,
+        )
+    finally:
+        await r.close()
+    return json.loads(result.model_dump_json())
+
+
 @router.post("/{job_id}/push")
 async def push_job_to_integration(
     job_id: str,

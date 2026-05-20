@@ -95,12 +95,27 @@ class PersonalizeRequest(BaseModel):
         default=False,
         description="Generate a follow-up email per variation (additional LLM call per variation).",
     )
+    icp_profile_id: Optional[str] = Field(
+        default=None,
+        description="If set, score the prospect against this saved ICP profile and include the score in the response.",
+    )
+    icp_description: Optional[str] = Field(
+        default=None,
+        description="Ad-hoc ICP description (free text). Used if icp_profile_id is not set.",
+    )
+
+
+class IcpFit(BaseModel):
+    score: int  # 0-100
+    reason: str
+    profile_id: Optional[str] = None
 
 
 class PersonalizeResponse(BaseModel):
     brand: str
     brief: Brief
     variations: list[Variation] = Field(default_factory=list)
+    icp_fit: Optional[IcpFit] = None
     # `emails` kept for backward compat with single-model callers (eval harness, SDK).
     # Populated with one entry keyed by the highest level requested, using slot A.
     emails: dict[int, EmailDraft] = Field(default_factory=dict)

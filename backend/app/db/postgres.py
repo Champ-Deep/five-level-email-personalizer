@@ -25,6 +25,10 @@ async_session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=
 _ADDITIVE_MIGRATIONS: tuple[str, ...] = (
     # Postgres 9.6+: ADD COLUMN IF NOT EXISTS is built-in.
     "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_filename VARCHAR(255)",
+    "ALTER TABLE personalization_runs ADD COLUMN IF NOT EXISTS edited_subject VARCHAR(400)",
+    "ALTER TABLE personalization_runs ADD COLUMN IF NOT EXISTS edited_body VARCHAR(8000)",
+    "ALTER TABLE personalization_runs ADD COLUMN IF NOT EXISTS edited_followup_subject VARCHAR(400)",
+    "ALTER TABLE personalization_runs ADD COLUMN IF NOT EXISTS edited_followup_body VARCHAR(8000)",
 )
 
 

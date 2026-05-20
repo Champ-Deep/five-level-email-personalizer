@@ -38,6 +38,7 @@ export function InternalAppRoute() {
   const [pushTargetId, setPushTargetId] = useState<string>("");
   const [pushing, setPushing] = useState(false);
   const [pushResult, setPushResult] = useState<PushResult | null>(null);
+  const [regenerating, setRegenerating] = useState<Record<number, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -212,6 +213,25 @@ export function InternalAppRoute() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  const regenerateRow = async (index: number) => {
+    if (!jobId) return;
+    setRegenerating(r => ({ ...r, [index]: true }));
+    setErr(null);
+    try {
+      await api.regenerateRow(jobId, index, {
+        include_followup: includeFollowup,
+        tone_preset: tonePreset || undefined,
+      });
+      // Refresh job state so the row picks up the new variations.
+      const j = await api.getJob(jobId);
+      setJob(j);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRegenerating(r => ({ ...r, [index]: false }));
+    }
   };
 
   const pushToIntegration = async () => {
@@ -432,6 +452,7 @@ export function InternalAppRoute() {
                     <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--brand-accent)" }}>Reply</th>
                     <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--brand-accent)" }}>Deliv.</th>
                     <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--brand-accent)" }}>Model</th>
+                    <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--brand-accent)" }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -461,6 +482,19 @@ export function InternalAppRoute() {
                       </td>
                       <td className="px-3 py-2 text-[11px]" style={{ color: "var(--brand-muted)" }}>
                         {r.best ? `${r.best.slot} · ${r.best.model.split("/").pop()}` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {r.best && (
+                          <button
+                            onClick={() => regenerateRow(r.index)}
+                            disabled={regenerating[r.index]}
+                            className="rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                            style={{ borderColor: "var(--brand-rule)", color: "var(--brand-accent)" }}
+                            title="Regenerate this row only"
+                          >
+                            {regenerating[r.index] ? "…" : "↻ Regenerate"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

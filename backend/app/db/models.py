@@ -115,6 +115,40 @@ class WebhookDelivery(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class SuppressionEntry(Base):
+    """Do-not-contact list. Either an email address or a whole domain.
+    Matching is exact for emails (case-insensitive) and exact-suffix for
+    domains. Skipped at batch-time without consuming LLM tokens.
+    """
+    __tablename__ = "suppression_entries"
+    __table_args__ = (
+        UniqueConstraint("owner_email", "email", "domain", name="uq_suppression_owner_target"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    email: Mapped[str | None] = mapped_column(String(320), index=True)
+    domain: Mapped[str | None] = mapped_column(String(255), index=True)
+    reason: Mapped[str | None] = mapped_column(String(200))  # e.g. "unsubscribed 2025-10-12"
+    source: Mapped[str] = mapped_column(String(40), default="manual")  # manual | csv_upload | api | webhook
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IcpProfile(Base):
+    """A saved ICP description used by the ICP-fit scorer.
+    `description` is free-text used directly as part of the scoring prompt.
+    """
+    __tablename__ = "icp_profiles"
+    __table_args__ = (UniqueConstraint("owner_email", "label", name="uq_icp_owner_label"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(String(2000), nullable=False)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class IntegrationCredential(Base):
     """Stored credentials for a third-party connector (Instantly, ChampMail,
     ChampIQ webhook target, etc.). Sensitive values inside `config` are
@@ -157,6 +191,13 @@ class PersonalizationRun(Base):
     request_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     response_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     picked_slot: Mapped[str | None] = mapped_column(String(8))  # nullable; user can update later
+    # Inline-edit overrides. When set, these take precedence over the LLM
+    # output during export + integration push. Stored separately so we
+    # never lose the original generation.
+    edited_subject: Mapped[str | None] = mapped_column(String(400))
+    edited_body: Mapped[str | None] = mapped_column(String(8000))
+    edited_followup_subject: Mapped[str | None] = mapped_column(String(400))
+    edited_followup_body: Mapped[str | None] = mapped_column(String(8000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 

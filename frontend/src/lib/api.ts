@@ -184,6 +184,10 @@ export interface HistoryDetail extends HistoryItem {
   style_rules: string | null;
   request_payload: Record<string, unknown>;
   response_payload: PersonalizeResponse;
+  edited_subject?: string | null;
+  edited_body?: string | null;
+  edited_followup_subject?: string | null;
+  edited_followup_body?: string | null;
 }
 
 export interface SavedSender {
@@ -218,6 +222,47 @@ export interface PushResult {
   failed: number;
   errors: string[];
   provider: string;
+}
+
+export interface SuppressionEntry {
+  id: string;
+  email: string | null;
+  domain: string | null;
+  reason: string | null;
+  source: string;
+  created_at: string;
+}
+
+export interface IcpProfile {
+  id: string;
+  label: string;
+  description: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export type ReplyIntent =
+  | "interested" | "not_interested" | "ooo" | "wrong_person"
+  | "unsubscribe" | "info_request" | "scheduling" | "other";
+
+export interface ReplyClassification {
+  intent: ReplyIntent;
+  confidence: number;
+  summary: string;
+  suggested_action: string;
+}
+
+export interface ReplyDraft {
+  label: string;
+  subject: string | null;
+  body: string;
+}
+
+export interface RewriteResult {
+  subject: string;
+  body: string;
+  word_count: number;
+  instruction: string;
 }
 
 export const api = {
@@ -388,4 +433,79 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ integration_id: integrationId, pick }),
     }),
+
+  // Suppression list (DNC)
+  listSuppressions: () => request<SuppressionEntry[]>(`/v1/suppressions`),
+  addSuppression: (body: { email?: string; domain?: string; reason?: string }) =>
+    request<SuppressionEntry>(`/v1/suppressions`, { method: "POST", body: JSON.stringify(body) }),
+  deleteSuppression: (id: string) => request<void>(`/v1/suppressions/${id}`, { method: "DELETE" }),
+  bulkUploadSuppressions: async (file: File): Promise<{ added: number; skipped: number }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const headers: Record<string, string> = {};
+    const t = getToken();
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+    const res = await fetch(`/v1/suppressions/bulk`, { method: "POST", body: fd, headers });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`Upload failed: ${detail}`);
+    }
+    return res.json();
+  },
+
+  // ICP profiles
+  listIcpProfiles: () => request<IcpProfile[]>(`/v1/icp-profiles`),
+  createIcpProfile: (body: { label: string; description: string; is_default?: boolean }) =>
+    request<IcpProfile>(`/v1/icp-profiles`, { method: "POST", body: JSON.stringify(body) }),
+  updateIcpProfile: (id: string, body: { label: string; description: string; is_default?: boolean }) =>
+    request<IcpProfile>(`/v1/icp-profiles/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteIcpProfile: (id: string) => request<void>(`/v1/icp-profiles/${id}`, { method: "DELETE" }),
+  scoreIcpOne: (
+    prospect: PersonalizeBody["prospect"],
+    opts: { icp_profile_id?: string; icp_description?: string },
+  ) => request<{ score: number; reason: string }>(`/v1/icp-profiles/score`, {
+    method: "POST",
+    body: JSON.stringify({ prospect, ...opts }),
+  }),
+
+  // Replies
+  classifyReply: (body: {
+    reply_body: string;
+    original_email?: string;
+    sender_first_name?: string;
+  }) => request<ReplyClassification>(`/v1/replies/classify`, {
+    method: "POST", body: JSON.stringify(body),
+  }),
+  draftReplies: (body: {
+    reply_body: string;
+    intent: ReplyIntent;
+    original_email?: string;
+    sender_name: string;
+    sender_company: string;
+    sender_offer?: string;
+    n?: number;
+  }) => request<{ drafts: ReplyDraft[] }>(`/v1/replies/draft`, {
+    method: "POST", body: JSON.stringify(body),
+  }),
+
+  // Rewrite (A2)
+  rewriteEmail: (body: { subject: string; body: string; instruction: string; model?: string }) =>
+    request<RewriteResult>(`/v1/personalize/rewrite`, { method: "POST", body: JSON.stringify(body) }),
+
+  // Per-row regenerate (A3)
+  regenerateRow: (jobId: string, index: number, opts: {
+    tone_preset?: string; style_rules?: string; include_followup?: boolean; model?: string
+  } = {}) =>
+    request<PersonalizeResponse>(`/v1/jobs/${jobId}/regenerate/${index}`, {
+      method: "POST", body: JSON.stringify(opts),
+    }),
+
+  // History edits (A1)
+  patchHistoryRun: (id: string, body: {
+    picked_slot?: "A" | "B" | "C";
+    edited_subject?: string | null;
+    edited_body?: string | null;
+    edited_followup_subject?: string | null;
+    edited_followup_body?: string | null;
+  }) => request<HistoryDetail>(`/v1/history/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 };
