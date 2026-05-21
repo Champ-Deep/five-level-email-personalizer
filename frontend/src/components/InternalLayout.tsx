@@ -4,12 +4,16 @@ import { api, getToken, setToken, type BrandConfig, type UserMe } from "@/lib/ap
 import { applyBrandTokens } from "@/lib/brandTokens";
 
 const NAV: Array<{ to: string; label: string }> = [
-  { to: "/app",          label: "Batch" },
-  { to: "/app/history",  label: "History" },
-  { to: "/app/senders",  label: "Saved senders" },
-  { to: "/app/api-keys", label: "API keys" },
-  { to: "/app/webhooks", label: "Webhooks" },
-  { to: "/app/settings", label: "Settings" },
+  { to: "/app",              label: "Batch" },
+  { to: "/app/history",      label: "History" },
+  { to: "/app/replies",      label: "Reply triage" },
+  { to: "/app/icp",          label: "ICP profiles" },
+  { to: "/app/suppressions", label: "Suppressions" },
+  { to: "/app/senders",      label: "Saved senders" },
+  { to: "/app/integrations", label: "Integrations" },
+  { to: "/app/api-keys",     label: "API keys" },
+  { to: "/app/webhooks",     label: "Webhooks" },
+  { to: "/app/settings",     label: "Settings" },
 ];
 
 interface Props {

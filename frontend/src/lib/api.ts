@@ -17,6 +17,25 @@ export function setToken(t: string | null) {
 
 type Body = unknown;
 
+/** Build an absolute API URL. Used by every fetch caller in this module
+ *  so we never accidentally hit the frontend origin for an API path
+ *  (which is what `failing to fetch` looks like in prod — the SPA's
+ *  history fallback returns index.html, json parse blows up).
+ */
+export function apiUrl(path: string): string {
+  if (path.startsWith("http")) return path;
+  return `${API_BASE}${path}`;
+}
+
+/** Add the auth header (and optional X-Brand) onto an existing headers map. */
+export function authHeaders(extra: Record<string, string> = {}, brand?: string): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  if (brand) headers["X-Brand"] = brand;
+  const t = getToken();
+  if (t) headers["Authorization"] = `Bearer ${t}`;
+  return headers;
+}
+
 async function request<T>(path: string, init: RequestInit & { brand?: string; auth?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -27,8 +46,7 @@ async function request<T>(path: string, init: RequestInit & { brand?: string; au
     const t = getToken();
     if (t) headers["Authorization"] = `Bearer ${t}`;
   }
-  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  const res = await fetch(url, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (!res.ok) {
     let detail: unknown;
     try { detail = await res.json(); } catch { detail = await res.text(); }
@@ -101,6 +119,7 @@ export interface Variation {
   label: string;
   model: string;
   email: EmailDraft;
+  followup?: EmailDraft | null;
 }
 
 export interface PersonalizeResponse {
@@ -183,6 +202,10 @@ export interface HistoryDetail extends HistoryItem {
   style_rules: string | null;
   request_payload: Record<string, unknown>;
   response_payload: PersonalizeResponse;
+  edited_subject?: string | null;
+  edited_body?: string | null;
+  edited_followup_subject?: string | null;
+  edited_followup_body?: string | null;
 }
 
 export interface SavedSender {
@@ -193,6 +216,71 @@ export interface SavedSender {
   offer: string;
   is_default: boolean;
   created_at: string;
+}
+
+export interface IntegrationProvider {
+  provider: string;
+  label: string;
+  required: string[];
+}
+
+export interface IntegrationOut {
+  id: string;
+  provider: string;
+  label: string;
+  is_default: boolean;
+  last_used_at: string | null;
+  created_at: string;
+  config_preview: Record<string, string>;
+}
+
+export interface PushResult {
+  ok: boolean;
+  pushed: number;
+  failed: number;
+  errors: string[];
+  provider: string;
+}
+
+export interface SuppressionEntry {
+  id: string;
+  email: string | null;
+  domain: string | null;
+  reason: string | null;
+  source: string;
+  created_at: string;
+}
+
+export interface IcpProfile {
+  id: string;
+  label: string;
+  description: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export type ReplyIntent =
+  | "interested" | "not_interested" | "ooo" | "wrong_person"
+  | "unsubscribe" | "info_request" | "scheduling" | "other";
+
+export interface ReplyClassification {
+  intent: ReplyIntent;
+  confidence: number;
+  summary: string;
+  suggested_action: string;
+}
+
+export interface ReplyDraft {
+  label: string;
+  subject: string | null;
+  body: string;
+}
+
+export interface RewriteResult {
+  subject: string;
+  body: string;
+  word_count: number;
+  instruction: string;
 }
 
 export const api = {
@@ -230,13 +318,53 @@ export const api = {
       body: JSON.stringify({ current_password, new_password }),
     }),
   logout: () => request<void>(`/v1/auth/logout`, { method: "POST" }),
+  forgotPassword: (email: string) =>
+    request<{ status: string }>(`/v1/auth/forgot-password`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      auth: false,
+    }),
+  resetPassword: (token: string, new_password: string) =>
+    request<{ token: string; email: string; name: string | null }>(`/v1/auth/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ token, new_password }),
+      auth: false,
+    }),
 
-  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][] }, brand: string) =>
+  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup?: boolean }, brand: string) =>
     request<{ job_id: string }>(`/v1/personalize/batch`, {
       method: "POST",
       body: JSON.stringify(body),
       brand,
     }),
+  // Excel multipart upload (server parses headers, no client-side xlsx lib needed).
+  batchExcel: async (
+    file: File,
+    sender: { name: string; company: string; offer: string },
+    opts: { brand: string; include_followup?: boolean; tone_preset?: string; style_rules?: string },
+  ): Promise<{ job_id: string; total: number; include_followup: boolean }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("sender_name", sender.name);
+    fd.append("sender_company", sender.company);
+    fd.append("sender_offer", sender.offer);
+    if (opts.include_followup) fd.append("include_followup", "true");
+    if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
+    if (opts.style_rules) fd.append("style_rules", opts.style_rules);
+    const res = await fetch(apiUrl(`/v1/personalize/excel`), {
+      method: "POST", body: fd, headers: authHeaders({}, opts.brand),
+    });
+    if (!res.ok) {
+      let d: unknown;
+      try { d = await res.json(); } catch { d = await res.text(); }
+      const msg = typeof d === "object" && d && "detail" in (d as object)
+        ? String((d as Record<string, unknown>).detail)
+        : `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    const j = await res.json();
+    return { job_id: j.job_id, total: Number(j.total || 0), include_followup: j.include_followup === "True" };
+  },
   getJob: (jobId: string) =>
     request<{
       job_id: string;
@@ -247,7 +375,24 @@ export const api = {
       failed_count: number;
       live: Record<string, unknown>;
       results: Record<number, PersonalizeResponse | { error: string }>;
+      has_source_excel: boolean;
+      source_filename: string | null;
     }>(`/v1/jobs/${jobId}`),
+  // Trigger a file download; returns the blob URL for the caller to use in an <a> click.
+  exportJob: async (jobId: string, opts: { format?: "xlsx" | "csv"; pick?: "A" | "B" | "C" | "auto" } = {}) => {
+    const sp = new URLSearchParams();
+    sp.set("format", opts.format || "xlsx");
+    sp.set("pick", opts.pick || "auto");
+    const res = await fetch(apiUrl(`/v1/jobs/${jobId}/export?${sp.toString()}`), {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
+    const blob = await res.blob();
+    const disp = res.headers.get("Content-Disposition") || "";
+    const m = /filename="([^"]+)"/.exec(disp);
+    const filename = m ? m[1] : `export-${jobId}.${opts.format || "xlsx"}`;
+    return { blob, filename };
+  },
 
   // API keys
   listApiKeys: () => request<ApiKeyOut[]>(`/v1/api-keys`),
@@ -298,4 +443,96 @@ export const api = {
   updateSender: (id: string, body: { label: string; name: string; company: string; offer: string; is_default?: boolean }) =>
     request<SavedSender>(`/v1/senders/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteSender: (id: string) => request<void>(`/v1/senders/${id}`, { method: "DELETE" }),
+
+  // Integrations
+  listIntegrationProviders: () => request<IntegrationProvider[]>(`/v1/integrations/providers`),
+  listIntegrations: () => request<IntegrationOut[]>(`/v1/integrations`),
+  createIntegration: (provider: string, label: string, config: Record<string, string>, is_default = false) =>
+    request<IntegrationOut>(`/v1/integrations`, {
+      method: "POST",
+      body: JSON.stringify({ provider, label, config, is_default }),
+    }),
+  updateIntegration: (id: string, body: { label?: string; config?: Record<string, string>; is_default?: boolean }) =>
+    request<IntegrationOut>(`/v1/integrations/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteIntegration: (id: string) => request<void>(`/v1/integrations/${id}`, { method: "DELETE" }),
+  healthcheckIntegration: (id: string) => request<{ ok: boolean; message: string }>(`/v1/integrations/${id}/healthcheck`, { method: "POST" }),
+  pushJobToIntegration: (jobId: string, integrationId: string, pick: "auto" | "A" | "B" | "C" = "auto") =>
+    request<PushResult>(`/v1/jobs/${jobId}/push`, {
+      method: "POST",
+      body: JSON.stringify({ integration_id: integrationId, pick }),
+    }),
+
+  // Suppression list (DNC)
+  listSuppressions: () => request<SuppressionEntry[]>(`/v1/suppressions`),
+  addSuppression: (body: { email?: string; domain?: string; reason?: string }) =>
+    request<SuppressionEntry>(`/v1/suppressions`, { method: "POST", body: JSON.stringify(body) }),
+  deleteSuppression: (id: string) => request<void>(`/v1/suppressions/${id}`, { method: "DELETE" }),
+  bulkUploadSuppressions: async (file: File): Promise<{ added: number; skipped: number }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(apiUrl(`/v1/suppressions/bulk`), {
+      method: "POST", body: fd, headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`Upload failed: ${detail}`);
+    }
+    return res.json();
+  },
+
+  // ICP profiles
+  listIcpProfiles: () => request<IcpProfile[]>(`/v1/icp-profiles`),
+  createIcpProfile: (body: { label: string; description: string; is_default?: boolean }) =>
+    request<IcpProfile>(`/v1/icp-profiles`, { method: "POST", body: JSON.stringify(body) }),
+  updateIcpProfile: (id: string, body: { label: string; description: string; is_default?: boolean }) =>
+    request<IcpProfile>(`/v1/icp-profiles/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteIcpProfile: (id: string) => request<void>(`/v1/icp-profiles/${id}`, { method: "DELETE" }),
+  scoreIcpOne: (
+    prospect: PersonalizeBody["prospect"],
+    opts: { icp_profile_id?: string; icp_description?: string },
+  ) => request<{ score: number; reason: string }>(`/v1/icp-profiles/score`, {
+    method: "POST",
+    body: JSON.stringify({ prospect, ...opts }),
+  }),
+
+  // Replies
+  classifyReply: (body: {
+    reply_body: string;
+    original_email?: string;
+    sender_first_name?: string;
+  }) => request<ReplyClassification>(`/v1/replies/classify`, {
+    method: "POST", body: JSON.stringify(body),
+  }),
+  draftReplies: (body: {
+    reply_body: string;
+    intent: ReplyIntent;
+    original_email?: string;
+    sender_name: string;
+    sender_company: string;
+    sender_offer?: string;
+    n?: number;
+  }) => request<{ drafts: ReplyDraft[] }>(`/v1/replies/draft`, {
+    method: "POST", body: JSON.stringify(body),
+  }),
+
+  // Rewrite (A2)
+  rewriteEmail: (body: { subject: string; body: string; instruction: string; model?: string }) =>
+    request<RewriteResult>(`/v1/personalize/rewrite`, { method: "POST", body: JSON.stringify(body) }),
+
+  // Per-row regenerate (A3)
+  regenerateRow: (jobId: string, index: number, opts: {
+    tone_preset?: string; style_rules?: string; include_followup?: boolean; model?: string
+  } = {}) =>
+    request<PersonalizeResponse>(`/v1/jobs/${jobId}/regenerate/${index}`, {
+      method: "POST", body: JSON.stringify(opts),
+    }),
+
+  // History edits (A1)
+  patchHistoryRun: (id: string, body: {
+    picked_slot?: "A" | "B" | "C";
+    edited_subject?: string | null;
+    edited_body?: string | null;
+    edited_followup_subject?: string | null;
+    edited_followup_body?: string | null;
+  }) => request<HistoryDetail>(`/v1/history/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 };
