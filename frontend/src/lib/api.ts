@@ -17,6 +17,25 @@ export function setToken(t: string | null) {
 
 type Body = unknown;
 
+/** Build an absolute API URL. Used by every fetch caller in this module
+ *  so we never accidentally hit the frontend origin for an API path
+ *  (which is what `failing to fetch` looks like in prod — the SPA's
+ *  history fallback returns index.html, json parse blows up).
+ */
+export function apiUrl(path: string): string {
+  if (path.startsWith("http")) return path;
+  return `${API_BASE}${path}`;
+}
+
+/** Add the auth header (and optional X-Brand) onto an existing headers map. */
+export function authHeaders(extra: Record<string, string> = {}, brand?: string): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  if (brand) headers["X-Brand"] = brand;
+  const t = getToken();
+  if (t) headers["Authorization"] = `Bearer ${t}`;
+  return headers;
+}
+
 async function request<T>(path: string, init: RequestInit & { brand?: string; auth?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -27,8 +46,7 @@ async function request<T>(path: string, init: RequestInit & { brand?: string; au
     const t = getToken();
     if (t) headers["Authorization"] = `Bearer ${t}`;
   }
-  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  const res = await fetch(url, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (!res.ok) {
     let detail: unknown;
     try { detail = await res.json(); } catch { detail = await res.text(); }
@@ -300,6 +318,18 @@ export const api = {
       body: JSON.stringify({ current_password, new_password }),
     }),
   logout: () => request<void>(`/v1/auth/logout`, { method: "POST" }),
+  forgotPassword: (email: string) =>
+    request<{ status: string }>(`/v1/auth/forgot-password`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      auth: false,
+    }),
+  resetPassword: (token: string, new_password: string) =>
+    request<{ token: string; email: string; name: string | null }>(`/v1/auth/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ token, new_password }),
+      auth: false,
+    }),
 
   batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup?: boolean }, brand: string) =>
     request<{ job_id: string }>(`/v1/personalize/batch`, {
@@ -321,10 +351,9 @@ export const api = {
     if (opts.include_followup) fd.append("include_followup", "true");
     if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
     if (opts.style_rules) fd.append("style_rules", opts.style_rules);
-    const headers: Record<string, string> = { "X-Brand": opts.brand };
-    const t = getToken();
-    if (t) headers["Authorization"] = `Bearer ${t}`;
-    const res = await fetch(`/v1/personalize/excel`, { method: "POST", body: fd, headers });
+    const res = await fetch(apiUrl(`/v1/personalize/excel`), {
+      method: "POST", body: fd, headers: authHeaders({}, opts.brand),
+    });
     if (!res.ok) {
       let d: unknown;
       try { d = await res.json(); } catch { d = await res.text(); }
@@ -354,10 +383,9 @@ export const api = {
     const sp = new URLSearchParams();
     sp.set("format", opts.format || "xlsx");
     sp.set("pick", opts.pick || "auto");
-    const headers: Record<string, string> = {};
-    const t = getToken();
-    if (t) headers["Authorization"] = `Bearer ${t}`;
-    const res = await fetch(`/v1/jobs/${jobId}/export?${sp.toString()}`, { headers });
+    const res = await fetch(apiUrl(`/v1/jobs/${jobId}/export?${sp.toString()}`), {
+      headers: authHeaders(),
+    });
     if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
     const blob = await res.blob();
     const disp = res.headers.get("Content-Disposition") || "";
@@ -442,10 +470,9 @@ export const api = {
   bulkUploadSuppressions: async (file: File): Promise<{ added: number; skipped: number }> => {
     const fd = new FormData();
     fd.append("file", file);
-    const headers: Record<string, string> = {};
-    const t = getToken();
-    if (t) headers["Authorization"] = `Bearer ${t}`;
-    const res = await fetch(`/v1/suppressions/bulk`, { method: "POST", body: fd, headers });
+    const res = await fetch(apiUrl(`/v1/suppressions/bulk`), {
+      method: "POST", body: fd, headers: authHeaders(),
+    });
     if (!res.ok) {
       const detail = await res.text();
       throw new Error(`Upload failed: ${detail}`);

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ApiKeysRoute } from "./routes/ApiKeys";
+import { ForgotPasswordRoute } from "./routes/ForgotPassword";
 import { HistoryRoute } from "./routes/History";
 import { IcpProfilesRoute } from "./routes/IcpProfiles";
 import { IntegrationsRoute } from "./routes/Integrations";
@@ -8,6 +9,7 @@ import { InternalAppRoute } from "./routes/InternalApp";
 import { LeadMagnetRoute } from "./routes/LeadMagnet";
 import { LoginRoute } from "./routes/Login";
 import { RepliesRoute } from "./routes/Replies";
+import { ResetPasswordRoute } from "./routes/ResetPassword";
 import { SendersRoute } from "./routes/Senders";
 import { SettingsRoute } from "./routes/Settings";
 import { SignupRoute } from "./routes/Signup";
@@ -34,6 +36,8 @@ export default function App() {
 
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/signup" element={<SignupRoute />} />
+      <Route path="/forgot-password" element={<ForgotPasswordRoute />} />
+      <Route path="/reset-password" element={<ResetPasswordRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
