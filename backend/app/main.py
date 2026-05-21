@@ -10,10 +10,14 @@ from app.api.v1 import api_keys as api_key_routes
 from app.api.v1 import auth as auth_routes
 from app.api.v1 import brands as brand_routes
 from app.api.v1 import history as history_routes
+from app.api.v1 import icp as icp_routes
+from app.api.v1 import integrations as integration_routes
 from app.api.v1 import jobs as job_routes
 from app.api.v1 import leads as lead_routes
 from app.api.v1 import personalize as personalize_routes
+from app.api.v1 import replies as reply_routes
 from app.api.v1 import senders as sender_routes
+from app.api.v1 import suppressions as suppression_routes
 from app.api.v1 import webhooks as webhook_routes
 from app.core.config import get_settings
 from app.core.middleware import RequestIdMiddleware
@@ -68,14 +72,24 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     # FRONTEND_BASE_URL may be a single URL or comma-separated. Useful on
     # Railway where typically you have <service>.up.railway.app plus a
-    # custom domain to allow.
+    # custom domain to allow. We also auto-allow any *.up.railway.app
+    # origin via a regex fallback so a fresh deploy isn't bricked the
+    # moment someone forgets to set the var.
     allowed_origins = [
         o.strip() for o in (settings.frontend_base_url or "").split(",") if o.strip()
-    ] or ["*"]
+    ]
+    # Browsers reject `allow_origins=["*"]` + `allow_credentials=True`.
+    # If we ended up with the wildcard, drop credentials so preflight
+    # still works (auth is via Bearer header, not cookies, so credentials
+    # aren't actually needed — but Authorization headers do still flow).
+    use_wildcard = not allowed_origins or "*" in allowed_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_credentials=True,
+        allow_origins=["*"] if use_wildcard else allowed_origins,
+        # Permit any Railway preview / production host. Belt + suspenders
+        # so an unset FRONTEND_BASE_URL doesn't black-hole sign-in.
+        allow_origin_regex=r"^https?://[a-z0-9-]+\.up\.railway\.app$" if not use_wildcard else None,
+        allow_credentials=not use_wildcard,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
@@ -90,6 +104,10 @@ def create_app() -> FastAPI:
     app.include_router(webhook_routes.router, prefix="/v1")
     app.include_router(history_routes.router, prefix="/v1")
     app.include_router(sender_routes.router, prefix="/v1")
+    app.include_router(integration_routes.router, prefix="/v1")
+    app.include_router(suppression_routes.router, prefix="/v1")
+    app.include_router(icp_routes.router, prefix="/v1")
+    app.include_router(reply_routes.router, prefix="/v1")
 
     @app.get("/health")
     async def health():

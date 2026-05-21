@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     # Personalizer
     max_concurrent_levels: int = Field(default=8, description="asyncio semaphore for OpenRouter fan-out")
 
+    # Transactional email (Resend). When `resend_api_key` is empty the
+    # email service no-ops and the password-reset endpoint logs the link
+    # to stderr instead — handy for local dev without a Resend account.
+    resend_api_key: str = ""
+    resend_base_url: str = "https://api.resend.com"
+    resend_from: str = "Champ Personalize <noreply@championsmail.com>"
+    # Length of a password-reset link's validity. 60 min is the sweet
+    # spot — long enough to survive an inbox delay, short enough to
+    # limit blast radius from a forwarded email.
+    password_reset_ttl_minutes: int = 60
+
     @property
     def brands_path(self) -> Path:
         path = Path(self.brands_dir)

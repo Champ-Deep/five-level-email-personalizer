@@ -33,6 +33,10 @@ class HistoryDetail(HistoryItem):
     style_rules: Optional[str]
     request_payload: dict[str, Any]
     response_payload: dict[str, Any]
+    edited_subject: Optional[str] = None
+    edited_body: Optional[str] = None
+    edited_followup_subject: Optional[str] = None
+    edited_followup_body: Optional[str] = None
 
 
 class HistoryList(BaseModel):
@@ -42,8 +46,13 @@ class HistoryList(BaseModel):
     offset: int
 
 
-class PickRequest(BaseModel):
-    picked_slot: str  # "A" | "B" | "C" — which variation the user picked
+class HistoryPatch(BaseModel):
+    """All optional. Send whichever fields you want to update."""
+    picked_slot: Optional[str] = None  # "A" | "B" | "C"
+    edited_subject: Optional[str] = None
+    edited_body: Optional[str] = None
+    edited_followup_subject: Optional[str] = None
+    edited_followup_body: Optional[str] = None
 
 
 def _owner_filter(subj: TokenSubject) -> tuple:
@@ -122,17 +131,25 @@ async def get_history_item(
         style_rules=r.style_rules,
         request_payload=r.request_payload,
         response_payload=r.response_payload,
+        edited_subject=r.edited_subject,
+        edited_body=r.edited_body,
+        edited_followup_subject=r.edited_followup_subject,
+        edited_followup_body=r.edited_followup_body,
     )
 
 
 @router.patch("/{run_id}", response_model=HistoryDetail)
 async def update_history_item(
     run_id: str,
-    body: PickRequest,
+    body: HistoryPatch,
     subj: TokenSubject = Depends(require_user),
     session: AsyncSession = Depends(get_session),
 ) -> HistoryDetail:
-    """Record which variation the user picked (for outcome tracking)."""
+    """Update a run: change picked variation and/or apply inline edits.
+
+    Edited values take precedence over the LLM output on export + push.
+    Sending `null` or empty string clears that edit (reverts to LLM output).
+    """
     try:
         rid = uuid.UUID(run_id)
     except ValueError:
@@ -140,15 +157,25 @@ async def update_history_item(
     r = (await session.execute(select(PersonalizationRun).where(PersonalizationRun.id == rid))).scalar_one_or_none()
     if r is None or r.owner_sub != subj.sub:
         raise HTTPException(status_code=404, detail="Run not found")
-    if body.picked_slot not in {"A", "B", "C"}:
-        raise HTTPException(status_code=400, detail="picked_slot must be A, B, or C")
-    r.picked_slot = body.picked_slot
+    if body.picked_slot is not None:
+        if body.picked_slot not in {"A", "B", "C"}:
+            raise HTTPException(status_code=400, detail="picked_slot must be A, B, or C")
+        r.picked_slot = body.picked_slot
+    # Edits: None means don't touch; empty string means clear the override.
+    for attr in ("edited_subject", "edited_body", "edited_followup_subject", "edited_followup_body"):
+        v = getattr(body, attr)
+        if v is not None:
+            setattr(r, attr, v.strip() or None)
     await session.commit()
     return HistoryDetail(
         **_to_item(r).model_dump(),
         style_rules=r.style_rules,
         request_payload=r.request_payload,
         response_payload=r.response_payload,
+        edited_subject=r.edited_subject,
+        edited_body=r.edited_body,
+        edited_followup_subject=r.edited_followup_subject,
+        edited_followup_body=r.edited_followup_body,
     )
 
 

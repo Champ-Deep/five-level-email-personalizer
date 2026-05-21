@@ -46,6 +46,10 @@ class Job(Base):
     done: Mapped[int] = mapped_column(default=0)
     failed_count: Mapped[int] = mapped_column(default=0)
     request_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # When the user uploaded an Excel file, we stash the filename here and
+    # the bytes in Redis (key `job:{id}:source_excel`, 7-day TTL). Keeping
+    # binary blobs out of Postgres is a deliberate choice.
+    source_filename: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -111,6 +115,58 @@ class WebhookDelivery(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class SuppressionEntry(Base):
+    """Do-not-contact list. Either an email address or a whole domain.
+    Matching is exact for emails (case-insensitive) and exact-suffix for
+    domains. Skipped at batch-time without consuming LLM tokens.
+    """
+    __tablename__ = "suppression_entries"
+    __table_args__ = (
+        UniqueConstraint("owner_email", "email", "domain", name="uq_suppression_owner_target"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    email: Mapped[str | None] = mapped_column(String(320), index=True)
+    domain: Mapped[str | None] = mapped_column(String(255), index=True)
+    reason: Mapped[str | None] = mapped_column(String(200))  # e.g. "unsubscribed 2025-10-12"
+    source: Mapped[str] = mapped_column(String(40), default="manual")  # manual | csv_upload | api | webhook
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IcpProfile(Base):
+    """A saved ICP description used by the ICP-fit scorer.
+    `description` is free-text used directly as part of the scoring prompt.
+    """
+    __tablename__ = "icp_profiles"
+    __table_args__ = (UniqueConstraint("owner_email", "label", name="uq_icp_owner_label"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(String(2000), nullable=False)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IntegrationCredential(Base):
+    """Stored credentials for a third-party connector (Instantly, ChampMail,
+    ChampIQ webhook target, etc.). Sensitive values inside `config` are
+    Fernet-encrypted at rest using a key derived from JWT_SECRET.
+    """
+    __tablename__ = "integration_credentials"
+    __table_args__ = (UniqueConstraint("owner_email", "provider", "label", name="uq_integration_owner_provider_label"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # "instantly" | "champmail" | "champiq"
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    config_encrypted: Mapped[str] = mapped_column(String(4000), nullable=False)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PersonalizationRun(Base):
     """Every successful /v1/personalize call by an authenticated caller.
 
@@ -135,6 +191,13 @@ class PersonalizationRun(Base):
     request_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     response_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     picked_slot: Mapped[str | None] = mapped_column(String(8))  # nullable; user can update later
+    # Inline-edit overrides. When set, these take precedence over the LLM
+    # output during export + integration push. Stored separately so we
+    # never lose the original generation.
+    edited_subject: Mapped[str | None] = mapped_column(String(400))
+    edited_body: Mapped[str | None] = mapped_column(String(8000))
+    edited_followup_subject: Mapped[str | None] = mapped_column(String(400))
+    edited_followup_body: Mapped[str | None] = mapped_column(String(8000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
@@ -165,4 +228,23 @@ class EvalRun(Base):
     baseline_mean: Mapped[float | None] = mapped_column()
     percent_of_baseline: Mapped[float | None] = mapped_column()
     per_level: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PasswordResetToken(Base):
+    """One-use token mailed to the user for a forgot-password flow.
+
+    We store the SHA-256 hash of the token (not the token itself) so that
+    a leaked database row can't be used to reset somebody's password —
+    the only way in is the email link. `used_at` flips on successful
+    consumption so the same link can't be replayed.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
