@@ -114,12 +114,20 @@ export interface EmailDraft {
   scores?: EmailScores | null;
 }
 
+export interface LinkedInDraft {
+  body: string;
+  char_count: number;
+  anchor_signal: string;
+  warnings: string[];
+}
+
 export interface Variation {
   slot: string;
   label: string;
   model: string;
   email: EmailDraft;
   followup?: EmailDraft | null;
+  linkedin?: LinkedInDraft | null;
 }
 
 export interface PersonalizeResponse {
@@ -139,6 +147,8 @@ export interface PersonalizeBody {
   system_prompt_override?: string | null;
   style_rules?: string | null;
   tone_preset?: string | null;
+  include_followup?: boolean;
+  include_linkedin?: boolean;
 }
 
 export interface UserMe {
@@ -276,6 +286,19 @@ export interface ReplyDraft {
   body: string;
 }
 
+export interface BulkReplyItem {
+  id: string;
+  intent: ReplyIntent;
+  confidence: number;
+  summary: string;
+  suggested_action: string;
+}
+
+export interface BulkClassifyResponse {
+  items: BulkReplyItem[];
+  by_intent: Record<string, string[]>;
+}
+
 export interface RewriteResult {
   subject: string;
   body: string;
@@ -341,7 +364,7 @@ export const api = {
   batchExcel: async (
     file: File,
     sender: { name: string; company: string; offer: string },
-    opts: { brand: string; include_followup?: boolean; tone_preset?: string; style_rules?: string },
+    opts: { brand: string; include_followup?: boolean; include_linkedin?: boolean; tone_preset?: string; style_rules?: string },
   ): Promise<{ job_id: string; total: number; include_followup: boolean }> => {
     const fd = new FormData();
     fd.append("file", file);
@@ -349,6 +372,7 @@ export const api = {
     fd.append("sender_company", sender.company);
     fd.append("sender_offer", sender.offer);
     if (opts.include_followup) fd.append("include_followup", "true");
+    if (opts.include_linkedin) fd.append("include_linkedin", "true");
     if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
     if (opts.style_rules) fd.append("style_rules", opts.style_rules);
     const res = await fetch(apiUrl(`/v1/personalize/excel`), {
@@ -503,6 +527,10 @@ export const api = {
   }) => request<ReplyClassification>(`/v1/replies/classify`, {
     method: "POST", body: JSON.stringify(body),
   }),
+  classifyRepliesBulk: (items: Array<{ id: string; reply_body: string; original_email?: string }>) =>
+    request<BulkClassifyResponse>(`/v1/replies/classify-bulk`, {
+      method: "POST", body: JSON.stringify({ items }),
+    }),
   draftReplies: (body: {
     reply_body: string;
     intent: ReplyIntent;
@@ -521,7 +549,7 @@ export const api = {
 
   // Per-row regenerate (A3)
   regenerateRow: (jobId: string, index: number, opts: {
-    tone_preset?: string; style_rules?: string; include_followup?: boolean; model?: string
+    tone_preset?: string; style_rules?: string; include_followup?: boolean; include_linkedin?: boolean; model?: string
   } = {}) =>
     request<PersonalizeResponse>(`/v1/jobs/${jobId}/regenerate/${index}`, {
       method: "POST", body: JSON.stringify(opts),

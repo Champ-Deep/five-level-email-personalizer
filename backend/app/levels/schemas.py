@@ -47,6 +47,18 @@ class EmailDraft(BaseModel):
         return f"Subject: {self.subject}\n\n{self.body}\n\nBest,\n{sender_name}"
 
 
+class LinkedInDraft(BaseModel):
+    """LinkedIn DM rendering of the same 5-layer pipeline.
+
+    LinkedIn DMs land best when they're conversational, ≤300 chars, and
+    skip the email signature/CTA conventions. We keep this shape close to
+    `EmailDraft` so the UI can render either with the same component."""
+    body: str
+    char_count: int
+    anchor_signal: str
+    warnings: list[str] = Field(default_factory=list)
+
+
 class LeveledEmail(BaseModel):
     level: int
     email: EmailDraft
@@ -66,6 +78,10 @@ class Variation(BaseModel):
     followup: Optional[EmailDraft] = Field(
         default=None,
         description="Optional follow-up email, generated when include_followup=true on the request.",
+    )
+    linkedin: Optional[LinkedInDraft] = Field(
+        default=None,
+        description="Optional LinkedIn DM, generated when include_linkedin=true on the request.",
     )
 
 
@@ -94,6 +110,10 @@ class PersonalizeRequest(BaseModel):
     include_followup: bool = Field(
         default=False,
         description="Generate a follow-up email per variation (additional LLM call per variation).",
+    )
+    include_linkedin: bool = Field(
+        default=False,
+        description="Generate a sub-300-char LinkedIn DM per variation (additional LLM call per variation, same model).",
     )
     icp_profile_id: Optional[str] = Field(
         default=None,
@@ -132,3 +152,4 @@ class BatchPersonalizeRequest(BaseModel):
     style_rules: Optional[str] = None
     tone_preset: Optional[str] = None
     include_followup: bool = False
+    include_linkedin: bool = False

@@ -292,6 +292,7 @@ async def personalize_excel(
     sender_company: str = Form(...),
     sender_offer: str = Form(...),
     include_followup: bool = Form(False),
+    include_linkedin: bool = Form(False),
     tone_preset: Optional[str] = Form(None),
     style_rules: Optional[str] = Form(None),
     brand: BrandConfig = Depends(resolve_brand),
@@ -336,6 +337,7 @@ async def personalize_excel(
         sender=_SI(name=sender_name, company=sender_company, offer=sender_offer),
         levels=[5],
         include_followup=include_followup,
+        include_linkedin=include_linkedin,
         tone_preset=tone_preset,
         style_rules=style_rules,
     )
@@ -397,4 +399,9 @@ async def personalize_excel(
         import logging
         logging.warning("Webhook emit failed for batch.queued (excel): %s", e)
 
-    return {"job_id": str(job.id), "total": str(job.total), "include_followup": str(include_followup)}
+    return {
+        "job_id": str(job.id),
+        "total": str(job.total),
+        "include_followup": str(include_followup),
+        "include_linkedin": str(include_linkedin),
+    }

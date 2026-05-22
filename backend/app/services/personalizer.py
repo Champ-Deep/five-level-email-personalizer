@@ -15,6 +15,7 @@ from app.levels.prompts import (
 from app.levels.schemas import (
     Brief,
     EmailDraft,
+    LinkedInDraft,
     PersonalizeRequest,
     PersonalizeResponse,
     ProspectInput,
@@ -26,6 +27,7 @@ from app.services.brand_service import BrandConfig
 from app.services.llm.base import LLMError, LLMProvider
 from app.services.llm.openrouter import extract_json
 from app.levels.followup_prompts import followup_prompt
+from app.levels.linkedin_prompts import linkedin_prompt
 from app.services.research_service import research_prospect
 from app.services.scores import score_email
 
@@ -79,8 +81,41 @@ def _normalize_email_keys(data: dict) -> dict:
     aliases = {
         "wordCount": "word_count",
         "anchorSignal": "anchor_signal",
+        "charCount": "char_count",
     }
     return {aliases.get(k, k): v for k, v in data.items()}
+
+
+def _validate_linkedin(draft: LinkedInDraft) -> list[str]:
+    """Anti-slop pass for LinkedIn DMs. Mirrors `_validate` for emails
+    but with different rules:
+      - HARD 300-char limit
+      - same banned words + em-dash + not-X-but-Y check
+    The 300-char check uses len(body), not word count, because LinkedIn
+    truncates by character.
+    """
+    warnings: list[str] = []
+    body = (draft.body or "").strip()
+    draft.char_count = len(body)
+    if draft.char_count == 0:
+        warnings.append("linkedin body is empty")
+    elif draft.char_count > 300:
+        warnings.append(f"linkedin body is {draft.char_count} chars (max 300)")
+
+    lower = body.lower()
+    for word in BANNED_WORDS:
+        if word in lower:
+            warnings.append(f"contains banned phrase: '{word}'")
+    for dash in EM_DASH_CHARS:
+        if dash in body:
+            warnings.append(f"contains em/en-dash '{dash}' (use commas or periods)")
+            break
+    for pattern in NOT_X_BUT_Y_PATTERNS:
+        m = re.search(pattern, lower)
+        if m:
+            warnings.append(f"contains AI cliché 'not X, but Y': '{m.group(0).strip()}'")
+            break
+    return warnings
 
 
 async def _generate_one(
@@ -282,6 +317,45 @@ async def personalize(
         for v in variations:
             v.followup = followup_by_slot.get(v.slot)
 
+    # Optional LinkedIn DM: same model as the variation. Runs in
+    # parallel across variations under the same semaphore so we don't
+    # blow the OpenRouter rate limit on a single big batch.
+    if request.include_linkedin and variations:
+        async def _gen_linkedin(v: Variation) -> tuple[str, LinkedInDraft | None]:
+            if v.email.subject.startswith("[") or not v.email.body:
+                return v.slot, None
+            prompt = linkedin_prompt(brief, sender, v.email)
+            try:
+                async with semaphore:
+                    raw = await provider.chat(
+                        [{"role": "user", "content": prompt}],
+                        model=v.model,
+                        max_tokens=1500,
+                        temperature=0.7,
+                        system=system_prompt(brand.system_prompt_addendum, composed_style_rules),
+                    )
+                data = _normalize_email_keys(extract_json(raw))
+                draft = LinkedInDraft(
+                    body=str(data.get("body", "")).strip(),
+                    char_count=int(data.get("char_count") or len(str(data.get("body", "")))),
+                    anchor_signal=str(data.get("anchor_signal", "")).strip(),
+                )
+                w = _validate_linkedin(draft)
+                if w:
+                    draft.warnings = w
+                return v.slot, draft
+            except Exception as e:
+                return v.slot, LinkedInDraft(
+                    body=f"[LinkedIn DM {v.slot} failed: {e}]",
+                    char_count=0, anchor_signal="",
+                    warnings=[f"linkedin_error: {type(e).__name__}"],
+                )
+
+        linkedins = await asyncio.gather(*[_gen_linkedin(v) for v in variations], return_exceptions=False)
+        linkedin_by_slot = {slot: draft for slot, draft in linkedins}
+        for v in variations:
+            v.linkedin = linkedin_by_slot.get(v.slot)
+
     # Back-compat: surface variation A under `emails[level]` for single-model callers.
     emails: dict[int, EmailDraft] = {}
     if variations:
@@ -319,6 +393,7 @@ async def personalize_one(
     style_rules: Optional[str] = None,
     tone_preset: Optional[str] = None,
     include_followup: bool = False,
+    include_linkedin: bool = False,
     variations: Optional[list] = None,
 ) -> PersonalizeResponse:
     """Convenience entrypoint for SDK / worker callers."""
@@ -332,6 +407,7 @@ async def personalize_one(
         style_rules=style_rules,
         tone_preset=tone_preset,
         include_followup=include_followup,
+        include_linkedin=include_linkedin,
         variations=variations,
     )
     return await personalize(request, brand, provider)

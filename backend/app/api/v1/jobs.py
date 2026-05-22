@@ -138,12 +138,14 @@ async def export_job(
             continue
         email = chosen.get("email") or {}
         followup = chosen.get("followup") or {}
+        linkedin = chosen.get("linkedin") or {}
         scores = email.get("scores") or {}
         flattened[idx + 2] = {
             "subject": email.get("subject", ""),
             "body": email.get("body", ""),
             "followup_subject": followup.get("subject", "") if followup else "",
             "followup_body":    followup.get("body", "") if followup else "",
+            "linkedin": linkedin.get("body", "") if linkedin else "",
             "model": chosen.get("model", ""),
             "slot": chosen.get("slot", ""),
             "deliverability": (scores.get("deliverability") or {}).get("score"),
@@ -174,7 +176,7 @@ async def export_job(
 
     # CSV path (one row per prospect, one variation per row).
     lines: list[str] = [
-        '"name","title","domain","subject","body","followup_subject","followup_body","model","slot","deliverability","reply_likelihood","warnings"'
+        '"name","title","domain","subject","body","followup_subject","followup_body","linkedin","model","slot","deliverability","reply_likelihood","warnings"'
     ]
     prospects = (job.request_payload or {}).get("prospects") or []
     for idx, p in enumerate(prospects):
@@ -185,6 +187,7 @@ async def export_job(
             q(p.get("name")), q(p.get("title")), q(p.get("domain")),
             q(row.get("subject")), q(row.get("body")),
             q(row.get("followup_subject")), q(row.get("followup_body")),
+            q(row.get("linkedin")),
             q(row.get("model")), q(row.get("slot")),
             str(row.get("deliverability") or ""), str(row.get("reply_likelihood") or ""),
             q(" | ".join(row.get("warnings") or [])),
@@ -244,6 +247,7 @@ async def regenerate_one_row(
         tone_preset=payload.get("tone_preset") or base.get("tone_preset"),
         style_rules=payload.get("style_rules") or base.get("style_rules"),
         include_followup=bool(payload.get("include_followup", base.get("include_followup", False))),
+        include_linkedin=bool(payload.get("include_linkedin", base.get("include_linkedin", False))),
         model=payload.get("model"),
     )
     brand_cfg = load_brand(job.brand)
