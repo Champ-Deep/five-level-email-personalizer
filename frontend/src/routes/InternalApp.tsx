@@ -18,6 +18,7 @@ interface RowResult {
     deliverability: number | null;
   };
   followup?: { subject: string; body: string } | null;
+  linkedin?: { body: string; char_count: number } | null;
   error?: string;
 }
 
@@ -26,6 +27,7 @@ export function InternalAppRoute() {
   const [senders, setSenders] = useState<SavedSender[]>([]);
   const [senderId, setSenderId] = useState<string>("");
   const [includeFollowup, setIncludeFollowup] = useState(false);
+  const [includeLinkedin, setIncludeLinkedin] = useState(false);
   const [tonePreset, setTonePreset] = useState<string>("");
   const [rows, setRows] = useState<CsvRow[]>([]);
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -112,6 +114,7 @@ export function InternalAppRoute() {
         }, {
           brand: activeBrand.slug,
           include_followup: includeFollowup,
+          include_linkedin: includeLinkedin,
           tone_preset: tonePreset || undefined,
         });
         setJobId(r.job_id);
@@ -128,6 +131,7 @@ export function InternalAppRoute() {
           },
           levels: [5],
           include_followup: includeFollowup,
+          include_linkedin: includeLinkedin,
           ...(tonePreset ? { tone_preset: tonePreset } : {}),
         } as PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup: boolean };
         const { job_id } = await api.batch(body, activeBrand.slug);
@@ -191,6 +195,7 @@ export function InternalAppRoute() {
           deliverability: e.scores?.deliverability.score ?? null,
         },
         followup: chosen.followup ? { subject: chosen.followup.subject, body: chosen.followup.body } : null,
+        linkedin: chosen.linkedin ? { body: chosen.linkedin.body, char_count: chosen.linkedin.char_count } : null,
       };
     }).sort((a, b) => a.index - b.index);
   }, [job, pick]);
@@ -222,6 +227,7 @@ export function InternalAppRoute() {
     try {
       await api.regenerateRow(jobId, index, {
         include_followup: includeFollowup,
+        include_linkedin: includeLinkedin,
         tone_preset: tonePreset || undefined,
       });
       // Refresh job state so the row picks up the new variations.
@@ -313,6 +319,13 @@ export function InternalAppRoute() {
               onChange={e => setIncludeFollowup(e.target.checked)}
             />
             Include follow-up email
+          </label>
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--brand-ink)" }}>
+            <input
+              type="checkbox" checked={includeLinkedin}
+              onChange={e => setIncludeLinkedin(e.target.checked)}
+            />
+            Include LinkedIn DM
           </label>
           <button
             onClick={run}
@@ -469,6 +482,11 @@ export function InternalAppRoute() {
                           <>
                             <div className="font-semibold">{r.best.subject}</div>
                             {r.followup && <div className="mt-0.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>+ Follow-up: {r.followup.subject}</div>}
+                            {r.linkedin && (
+                              <div className="mt-0.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>
+                                + LinkedIn DM ({r.linkedin.char_count} chars)
+                              </div>
+                            )}
                           </>
                         ) : (
                           <em style={{ color: "var(--brand-muted)" }}>Pending…</em>

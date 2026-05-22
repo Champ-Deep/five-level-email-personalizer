@@ -37,6 +37,7 @@ APPENDED_COLUMNS: tuple[str, ...] = (
     "Personalized Body",
     "Follow-Up Subject",
     "Follow-Up Body",
+    "LinkedIn DM",
     "Model",
     "Slot",
     "Deliverability",
@@ -157,6 +158,7 @@ def write_excel_with_results(
             res.get("body", ""),
             res.get("followup_subject", ""),
             res.get("followup_body", ""),
+            res.get("linkedin", ""),
             res.get("model", ""),
             res.get("slot", ""),
             res.get("deliverability", ""),
@@ -165,7 +167,8 @@ def write_excel_with_results(
         ]
         for offset, value in enumerate(values):
             cell = ws.cell(row=row_idx, column=first_new_col + offset, value=value)
-            if "Body" in APPENDED_COLUMNS[offset]:
+            col_name = APPENDED_COLUMNS[offset]
+            if "Body" in col_name or col_name == "LinkedIn DM":
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
     ws.freeze_panes = "A2"
