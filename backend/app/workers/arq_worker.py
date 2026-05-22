@@ -57,6 +57,13 @@ async def batch_personalize_task(
                 levels=body.levels,
                 model=body.model,
                 system_prompt_override=body.system_prompt_override,
+                # The worker had been dropping these fields silently —
+                # batch jobs ignored include_followup / style_rules / etc.
+                # Wire them through so the worker matches single-call behaviour.
+                style_rules=body.style_rules,
+                tone_preset=body.tone_preset,
+                include_followup=body.include_followup,
+                include_linkedin=body.include_linkedin,
             )
             await redis.set(
                 f"pipeline:{job_id}:results:{idx}",

@@ -323,6 +323,34 @@ export function VariationCard({
                 </>
               )}
 
+              {variation.linkedin && variation.linkedin.body && (
+                <div
+                  className="mt-4 rounded-lg border p-3"
+                  style={{ background: "var(--brand-bg)", borderColor: "var(--brand-rule)", borderLeft: "3px solid #0a66c2" }}
+                >
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ background: "rgba(10,102,194,.10)", color: "#0a66c2" }}>
+                      LinkedIn DM
+                    </span>
+                    <span className="text-[10px] font-mono" style={{ color: "var(--brand-muted)" }}>
+                      {variation.linkedin.char_count}/300 chars
+                    </span>
+                    <span className="flex-1" />
+                    <CopyBtn text={variation.linkedin.body} />
+                  </div>
+                  <pre className="whitespace-pre-wrap break-words font-brand-display text-[13px] leading-relaxed"
+                    style={{ color: "var(--brand-ink)" }}>
+                    {variation.linkedin.body}
+                  </pre>
+                  {variation.linkedin.warnings && variation.linkedin.warnings.length > 0 && (
+                    <div className="mt-2 text-[11px]" style={{ color: "#92400e" }}>
+                      ⚠ {variation.linkedin.warnings.join(" · ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {showRewrite && (
                 <div
                   className="mt-4 rounded-lg border p-3"

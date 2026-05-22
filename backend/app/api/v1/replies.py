@@ -4,19 +4,25 @@ Designed for the post-send loop: a rep pastes the inbound reply, gets a
 fast classification (intent + suggested next action), and optionally
 asks for 2-3 draft response options.
 
-Both endpoints are deliberately stateless — they take the reply text
-and any optional context inline, and return JSON. No persistence here
-(reply storage / inbox sync is a bigger feature, queued).
+`classify-bulk` extends this to the "I just came back from PTO and have
+20 replies sitting in the inbox" workflow — paste them all, get a
+grouped summary, draft a single template per intent.
+
+All endpoints are deliberately stateless — they take the reply text
+inline and return JSON. No persistence here (reply storage / inbox
+sync is a bigger feature, queued).
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.auth import TokenSubject, require_user
+from app.core.config import get_settings
 from app.services.llm.openrouter import extract_json
 from app.services.llm.registry import get_provider
 
@@ -62,12 +68,12 @@ Classify the reply into ONE intent:
   other            — anything that doesn't fit above
 
 Return ONLY this JSON (no fences, no preamble):
-{
+{{
   "intent": "<one of the labels above>",
   "confidence": <integer 0-100>,
   "summary": "<one short sentence describing what the reply says>",
   "suggested_action": "<one short sentence telling the rep what to do next>"
-}
+}}
 
 REPLY BODY:
 {reply_body}
@@ -125,6 +131,92 @@ class DraftOption(BaseModel):
 
 class DraftOut(BaseModel):
     drafts: list[DraftOption]
+
+
+class BulkReplyItem(BaseModel):
+    """One reply in a bulk-classify request. `id` lets the caller stitch
+    results back to its own list (sales reps usually paste replies with
+    sender names attached and want to know which one matched which)."""
+    id: str = Field(..., min_length=1, max_length=80)
+    reply_body: str = Field(..., min_length=3, max_length=10000)
+    original_email: Optional[str] = Field(None, max_length=4000)
+
+
+class BulkClassifyIn(BaseModel):
+    items: list[BulkReplyItem] = Field(..., min_length=1, max_length=50)
+    model: Optional[str] = None
+
+
+class BulkClassifyItem(BaseModel):
+    id: str
+    intent: ReplyIntent
+    confidence: int
+    summary: str
+    suggested_action: str
+
+
+class BulkClassifyOut(BaseModel):
+    items: list[BulkClassifyItem]
+    by_intent: dict[str, list[str]]  # intent -> list of item ids
+
+
+@router.post("/classify-bulk", response_model=BulkClassifyOut)
+async def classify_replies_bulk(
+    body: BulkClassifyIn,
+    subj: TokenSubject = Depends(require_user),
+) -> BulkClassifyOut:
+    """Fan out the single-reply classifier across N items in parallel.
+
+    Cap is 50 items per request — that's plenty for the "back from PTO"
+    workflow and keeps token cost predictable. The semaphore matches
+    the personalizer's so we don't double up against the OpenRouter
+    rate limit during a busy minute.
+    """
+    settings = get_settings()
+    semaphore = asyncio.Semaphore(settings.max_concurrent_levels)
+    provider = get_provider("openrouter")
+    model = body.model or "meta-llama/llama-4-maverick"
+
+    async def _classify(item: BulkReplyItem) -> BulkClassifyItem:
+        prompt = CLASSIFY_PROMPT.format(
+            reply_body=item.reply_body.strip(),
+            original_email=(item.original_email or "").strip(),
+        )
+        try:
+            async with semaphore:
+                raw = await provider.chat(
+                    [{"role": "user", "content": prompt}],
+                    model=model,
+                    max_tokens=400,
+                    temperature=0.1,
+                    system="You are a precise B2B sales-ops assistant. Return ONLY valid JSON.",
+                )
+            data = extract_json(raw)
+            return BulkClassifyItem(
+                id=item.id,
+                intent=data.get("intent", "other"),
+                confidence=int(data.get("confidence", 0)),
+                summary=str(data.get("summary", "")).strip(),
+                suggested_action=str(data.get("suggested_action", "")).strip(),
+            )
+        except Exception as e:
+            # One failed reply doesn't tank the batch — surface the
+            # error in `summary` so the rep can see what went wrong on
+            # that row. Intent falls back to "other" so the row still
+            # groups somewhere.
+            return BulkClassifyItem(
+                id=item.id,
+                intent="other",
+                confidence=0,
+                summary=f"Classification failed: {e}",
+                suggested_action="Review manually.",
+            )
+
+    results = await asyncio.gather(*[_classify(it) for it in body.items])
+    by_intent: dict[str, list[str]] = {}
+    for r in results:
+        by_intent.setdefault(r.intent, []).append(r.id)
+    return BulkClassifyOut(items=results, by_intent=by_intent)
 
 
 DRAFT_PROMPT = """You draft response options to inbound replies on a cold-email thread.
