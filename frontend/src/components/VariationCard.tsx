@@ -323,6 +323,54 @@ export function VariationCard({
                 </>
               )}
 
+              {variation.sequence && variation.sequence.length > 0 && (
+                <details className="mt-4 rounded-lg border" style={{ borderColor: "var(--brand-rule)" }}>
+                  <summary
+                    className="cursor-pointer px-3 py-2 text-[11px] font-bold uppercase tracking-wider"
+                    style={{ color: "var(--brand-accent)", background: "var(--brand-accent-soft)" }}
+                  >
+                    Sequence — {variation.sequence.length} follow-up{variation.sequence.length === 1 ? "" : "s"}
+                  </summary>
+                  <div className="space-y-3 p-3">
+                    {variation.sequence.map((step, i) => {
+                      const stepFull = `Subject: ${step.subject}\n\n${step.body}\n\nBest,\n${senderName}`;
+                      return (
+                        <div
+                          key={i}
+                          className="rounded border p-3"
+                          style={{ borderColor: "var(--brand-rule)", background: "var(--brand-bg)" }}
+                        >
+                          <div className="mb-1 flex items-center gap-2">
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                              style={{ background: "var(--brand-accent-soft)", color: "var(--brand-accent)" }}
+                            >
+                              Step {i + 2}
+                            </span>
+                            <span className="text-[11px] font-semibold" style={{ color: "var(--brand-ink)" }}>
+                              {step.subject}
+                            </span>
+                            <span className="flex-1" />
+                            {!step.subject.startsWith("[") && <CopyBtn text={stepFull} />}
+                          </div>
+                          <pre
+                            className="whitespace-pre-wrap break-words font-brand-display text-[12.5px] leading-relaxed"
+                            style={{ color: "var(--brand-ink)" }}
+                          >
+                            {step.body}
+                          </pre>
+                          {step.warnings && step.warnings.length > 0 && (
+                            <div className="mt-1 text-[11px]" style={{ color: "#92400e" }}>
+                              ⚠ {step.warnings.join(" · ")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              )}
+
               {variation.linkedin && variation.linkedin.body && (
                 <div
                   className="mt-4 rounded-lg border p-3"

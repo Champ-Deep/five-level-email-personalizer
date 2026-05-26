@@ -2,6 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "personalizer-backend",
+      "runtimeExecutable": "backend/.venv/bin/uvicorn",
+      "runtimeArgs": ["app.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload", "--app-dir", "backend"],
+      "port": 8000
+    },
+    {
+      "name": "personalizer-worker",
+      "runtimeExecutable": "scripts/run-worker.sh",
+      "runtimeArgs": [],
+      "autoPort": true
+    },
+    {
       "name": "personalizer-frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],

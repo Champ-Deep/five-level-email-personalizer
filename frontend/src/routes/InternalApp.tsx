@@ -17,7 +17,9 @@ interface RowResult {
     reply_likelihood: number | null;
     deliverability: number | null;
   };
-  followup?: { subject: string; body: string } | null;
+  /** Per-row follow-up chain. `sequence[0]` is the first follow-up
+   *  (step 2 in the sequence), `sequence[1]` is step 3, etc. */
+  sequence?: Array<{ subject: string; body: string }>;
   linkedin?: { body: string; char_count: number } | null;
   error?: string;
 }
@@ -26,7 +28,9 @@ export function InternalAppRoute() {
   const [activeBrand, setActiveBrand] = useState<BrandConfig | null>(null);
   const [senders, setSenders] = useState<SavedSender[]>([]);
   const [senderId, setSenderId] = useState<string>("");
-  const [includeFollowup, setIncludeFollowup] = useState(false);
+  // Sequence length: 1 = initial only, 2 = + 1 follow-up, …, 5 = + 4
+  // follow-ups (bump → value drop → social proof → breakup).
+  const [sequenceLength, setSequenceLength] = useState<number>(1);
   const [includeLinkedin, setIncludeLinkedin] = useState(false);
   const [tonePreset, setTonePreset] = useState<string>("");
   const [rows, setRows] = useState<CsvRow[]>([]);
@@ -113,7 +117,7 @@ export function InternalAppRoute() {
           offer: selectedSender.offer,
         }, {
           brand: activeBrand.slug,
-          include_followup: includeFollowup,
+          sequence_length: sequenceLength,
           include_linkedin: includeLinkedin,
           tone_preset: tonePreset || undefined,
         });
@@ -130,10 +134,10 @@ export function InternalAppRoute() {
             offer: selectedSender.offer,
           },
           levels: [5],
-          include_followup: includeFollowup,
+          sequence_length: sequenceLength,
           include_linkedin: includeLinkedin,
           ...(tonePreset ? { tone_preset: tonePreset } : {}),
-        } as PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup: boolean };
+        } as PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; sequence_length: number };
         const { job_id } = await api.batch(body, activeBrand.slug);
         setJobId(job_id);
       }
@@ -194,7 +198,12 @@ export function InternalAppRoute() {
           reply_likelihood: e.scores?.reply_likelihood.score ?? null,
           deliverability: e.scores?.deliverability.score ?? null,
         },
-        followup: chosen.followup ? { subject: chosen.followup.subject, body: chosen.followup.body } : null,
+        // Sequence: step 1 is the initial email (already in `best`),
+        // step 2..N live in `chosen.sequence`. Fall back to `followup`
+        // for jobs cached pre-sequence-migration.
+        sequence: (chosen.sequence && chosen.sequence.length > 0)
+          ? chosen.sequence.map(s => ({ subject: s.subject, body: s.body }))
+          : (chosen.followup ? [{ subject: chosen.followup.subject, body: chosen.followup.body }] : []),
         linkedin: chosen.linkedin ? { body: chosen.linkedin.body, char_count: chosen.linkedin.char_count } : null,
       };
     }).sort((a, b) => a.index - b.index);
@@ -226,7 +235,7 @@ export function InternalAppRoute() {
     setErr(null);
     try {
       await api.regenerateRow(jobId, index, {
-        include_followup: includeFollowup,
+        sequence_length: sequenceLength,
         include_linkedin: includeLinkedin,
         tone_preset: tonePreset || undefined,
       });
@@ -314,11 +323,22 @@ export function InternalAppRoute() {
           <span className="text-sm" style={{ color: "var(--brand-muted)" }}>{totalRowCount}</span>
           <span className="flex-1" />
           <label className="flex items-center gap-2 text-sm" style={{ color: "var(--brand-ink)" }}>
-            <input
-              type="checkbox" checked={includeFollowup}
-              onChange={e => setIncludeFollowup(e.target.checked)}
-            />
-            Include follow-up email
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--brand-muted)" }}>
+              Sequence
+            </span>
+            <select
+              value={sequenceLength}
+              onChange={e => setSequenceLength(Number(e.target.value))}
+              className="rounded-md border px-2 py-1 text-sm outline-none"
+              style={inputStyle}
+              title="1 = initial only. 2-5 add follow-ups with distinct angles: bump → value drop → social proof → breakup."
+            >
+              <option value={1}>1 email</option>
+              <option value={2}>+ 1 follow-up (2 total)</option>
+              <option value={3}>+ 2 follow-ups (3 total)</option>
+              <option value={4}>+ 3 follow-ups (4 total)</option>
+              <option value={5}>+ 4 follow-ups (5 total)</option>
+            </select>
           </label>
           <label className="flex items-center gap-2 text-sm" style={{ color: "var(--brand-ink)" }}>
             <input
@@ -481,7 +501,11 @@ export function InternalAppRoute() {
                         ) : r.best ? (
                           <>
                             <div className="font-semibold">{r.best.subject}</div>
-                            {r.followup && <div className="mt-0.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>+ Follow-up: {r.followup.subject}</div>}
+                            {(r.sequence || []).map((s, i) => (
+                              <div key={i} className="mt-0.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>
+                                + Step {i + 2}: {s.subject}
+                              </div>
+                            ))}
                             {r.linkedin && (
                               <div className="mt-0.5 text-[11px]" style={{ color: "var(--brand-muted)" }}>
                                 + LinkedIn DM ({r.linkedin.char_count} chars)

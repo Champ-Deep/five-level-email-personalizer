@@ -127,24 +127,36 @@ async def export_job(
         await rb.aclose()
 
     # Index 0 in Redis corresponds to row 2 in Excel (row 1 is the header).
+    # `steps` is the sequence-shaped list (step 1 = initial, step 2+ = follow-ups).
+    # The Excel writer expands this into Subject 1 / Body 1 / Subject 2 / …
     flattened: dict[int, dict[str, Any]] = {}
     for idx, result in sorted(by_idx.items()):
         if "error" in result:
-            flattened[idx + 2] = {"warnings": [result.get("error", "error")]}
+            flattened[idx + 2] = {"warnings": [result.get("error", "error")], "steps": []}
             continue
         variations = result.get("variations", [])
         chosen = _pick_best_variation(variations, slot_hint=pick)
         if chosen is None:
             continue
         email = chosen.get("email") or {}
-        followup = chosen.get("followup") or {}
         linkedin = chosen.get("linkedin") or {}
         scores = email.get("scores") or {}
+        # Build the step list. Variation.sequence is the canonical source
+        # post-migration; fall back to the legacy `followup` field for
+        # old in-flight jobs cached in Redis pre-deploy.
+        steps: list[dict[str, str]] = [
+            {"subject": email.get("subject", ""), "body": email.get("body", "")}
+        ]
+        sequence = chosen.get("sequence") or []
+        if not sequence and chosen.get("followup"):
+            sequence = [chosen["followup"]]
+        for step in sequence:
+            steps.append({
+                "subject": (step or {}).get("subject", ""),
+                "body":    (step or {}).get("body", ""),
+            })
         flattened[idx + 2] = {
-            "subject": email.get("subject", ""),
-            "body": email.get("body", ""),
-            "followup_subject": followup.get("subject", "") if followup else "",
-            "followup_body":    followup.get("body", "") if followup else "",
+            "steps": steps,
             "linkedin": linkedin.get("body", "") if linkedin else "",
             "model": chosen.get("model", ""),
             "slot": chosen.get("slot", ""),
@@ -174,24 +186,38 @@ async def export_job(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
-    # CSV path (one row per prospect, one variation per row).
-    lines: list[str] = [
-        '"name","title","domain","subject","body","followup_subject","followup_body","linkedin","model","slot","deliverability","reply_likelihood","warnings"'
-    ]
+    # CSV path. Column count is dynamic: one Subject / Body pair per
+    # sequence step actually generated, plus the trailing fixed columns.
+    max_steps = max((len(r.get("steps") or []) for r in flattened.values()), default=1) or 1
+    step_headers: list[str] = []
+    for step in range(1, max_steps + 1):
+        step_headers.append(f"subject_{step}")
+        step_headers.append(f"body_{step}")
+    header = ['"name"', '"title"', '"domain"']
+    header.extend(f'"{h}"' for h in step_headers)
+    header.extend(['"linkedin"', '"model"', '"slot"', '"deliverability"', '"reply_likelihood"', '"warnings"'])
+    lines: list[str] = [",".join(header)]
+
     prospects = (job.request_payload or {}).get("prospects") or []
+
+    def q(s: Any) -> str:
+        return '"' + str(s or "").replace('"', '""').replace("\n", "\\n") + '"'
+
     for idx, p in enumerate(prospects):
         row = flattened.get(idx + 2, {})
-        def q(s: Any) -> str:
-            return '"' + str(s or "").replace('"', '""').replace("\n", "\\n") + '"'
-        lines.append(",".join([
-            q(p.get("name")), q(p.get("title")), q(p.get("domain")),
-            q(row.get("subject")), q(row.get("body")),
-            q(row.get("followup_subject")), q(row.get("followup_body")),
+        steps = row.get("steps") or []
+        out: list[str] = [q(p.get("name")), q(p.get("title")), q(p.get("domain"))]
+        for step_idx in range(max_steps):
+            step = steps[step_idx] if step_idx < len(steps) else {}
+            out.append(q(step.get("subject", "")))
+            out.append(q(step.get("body", "")))
+        out.extend([
             q(row.get("linkedin")),
             q(row.get("model")), q(row.get("slot")),
             str(row.get("deliverability") or ""), str(row.get("reply_likelihood") or ""),
             q(" | ".join(row.get("warnings") or [])),
-        ]))
+        ])
+        lines.append(",".join(out))
     csv_bytes = "\n".join(lines).encode("utf-8")
     return StreamingResponse(
         io.BytesIO(csv_bytes),
@@ -247,6 +273,7 @@ async def regenerate_one_row(
         tone_preset=payload.get("tone_preset") or base.get("tone_preset"),
         style_rules=payload.get("style_rules") or base.get("style_rules"),
         include_followup=bool(payload.get("include_followup", base.get("include_followup", False))),
+        sequence_length=int(payload.get("sequence_length", base.get("sequence_length", 1))),
         include_linkedin=bool(payload.get("include_linkedin", base.get("include_linkedin", False))),
         model=payload.get("model"),
     )

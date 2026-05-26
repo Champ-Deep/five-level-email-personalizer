@@ -63,6 +63,7 @@ async def batch_personalize_task(
                 style_rules=body.style_rules,
                 tone_preset=body.tone_preset,
                 include_followup=body.include_followup,
+                sequence_length=body.sequence_length,
                 include_linkedin=body.include_linkedin,
             )
             await redis.set(

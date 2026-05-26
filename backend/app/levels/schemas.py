@@ -75,14 +75,30 @@ class Variation(BaseModel):
     label: str
     model: str
     email: EmailDraft
-    followup: Optional[EmailDraft] = Field(
-        default=None,
-        description="Optional follow-up email, generated when include_followup=true on the request.",
-    )
+    # The full follow-up chain (in order). Length is request.sequence_length-1
+    # for any variation that didn't error. Each step intentionally picks a
+    # different angle from the prior ones (bump → value drop → social proof
+    # → breakup) so a 5-touch sequence doesn't read as repetitive.
+    sequence: list[EmailDraft] = Field(default_factory=list)
     linkedin: Optional[LinkedInDraft] = Field(
         default=None,
         description="Optional LinkedIn DM, generated when include_linkedin=true on the request.",
     )
+
+    @property
+    def followup(self) -> Optional[EmailDraft]:
+        """Back-compat: the first follow-up, if any. Older clients
+        reading `variation.followup` keep working unchanged."""
+        return self.sequence[0] if self.sequence else None
+
+    def model_dump(self, **kwargs):  # type: ignore[override]
+        """Override Pydantic dump to surface `followup` for old API
+        clients (the response JSON exposed it as a real field pre-
+        sequence). We add it back as a derived field on serialization."""
+        data = super().model_dump(**kwargs)
+        fu = self.sequence[0] if self.sequence else None
+        data["followup"] = fu.model_dump() if fu is not None else None
+        return data
 
 
 class PersonalizeRequest(BaseModel):
@@ -109,7 +125,13 @@ class PersonalizeRequest(BaseModel):
     )
     include_followup: bool = Field(
         default=False,
-        description="Generate a follow-up email per variation (additional LLM call per variation).",
+        description="DEPRECATED: kept for back-compat. Setting true is equivalent to sequence_length=2.",
+    )
+    sequence_length: int = Field(
+        default=1,
+        ge=1,
+        le=5,
+        description="Total emails per variation: 1 = initial only, 2 = initial + 1 follow-up, … up to 5. Each follow-up uses a different angle (bump → value drop → social proof → breakup). When `include_followup=true` overrides this to at least 2 for back-compat.",
     )
     include_linkedin: bool = Field(
         default=False,
@@ -152,4 +174,5 @@ class BatchPersonalizeRequest(BaseModel):
     style_rules: Optional[str] = None
     tone_preset: Optional[str] = None
     include_followup: bool = False
+    sequence_length: int = Field(default=1, ge=1, le=5)
     include_linkedin: bool = False

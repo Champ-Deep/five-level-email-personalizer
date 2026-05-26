@@ -31,12 +31,11 @@ HEADER_SYNONYMS: dict[str, tuple[str, ...]] = {
     "email":    ("email", "email address", "work email"),
 }
 
-# Output columns appended to the right of the user's data.
-APPENDED_COLUMNS: tuple[str, ...] = (
-    "Personalized Subject",
-    "Personalized Body",
-    "Follow-Up Subject",
-    "Follow-Up Body",
+REQUIRED_HEADERS = ("name", "title", "domain")
+
+# Columns that always come at the tail of the appended block (after the
+# per-step Subject/Body pairs).
+TRAILING_COLUMNS: tuple[str, ...] = (
     "LinkedIn DM",
     "Model",
     "Slot",
@@ -45,7 +44,19 @@ APPENDED_COLUMNS: tuple[str, ...] = (
     "Warnings",
 )
 
-REQUIRED_HEADERS = ("name", "title", "domain")
+
+def _step_columns(max_steps: int) -> list[str]:
+    """Build the dynamic per-step header labels.
+
+    Step 1 is the initial email (always there). Steps 2..N are follow-ups
+    that exist only when sequence_length>=2 on the job. We don't render
+    columns for steps that didn't generate anything on ANY row.
+    """
+    cols: list[str] = []
+    for step in range(1, max_steps + 1):
+        cols.append("Subject 1" if step == 1 else f"Subject {step}")
+        cols.append("Body 1" if step == 1 else f"Body {step}")
+    return cols
 
 
 def _normalize(s: str | None) -> str:
@@ -124,50 +135,89 @@ def write_excel_with_results(
 
     `results_by_row` is keyed by the original Excel row number (2-based,
     matching openpyxl iter_rows row index where the header is row 1).
-    Each value is a dict with keys: subject, body, followup_subject,
-    followup_body, model, slot, deliverability, reply_likelihood, warnings.
-    Missing keys come out blank.
+    Each value is a dict shaped like:
 
-    The original sheet contents are preserved verbatim. Output columns are
-    added immediately to the right of the last existing column.
+        {
+          "steps": [
+            {"subject": "...", "body": "..."},   # step 1 (initial)
+            {"subject": "...", "body": "..."},   # step 2 (follow-up)
+            ...
+          ],
+          "linkedin": "...",
+          "model": "...",
+          "slot": "...",
+          "deliverability": 87,
+          "reply_likelihood": 72,
+          "warnings": [...]
+        }
+
+    Column count is dynamic — we emit Subject/Body pairs for as many
+    steps as the longest sequence actually produced.
+
+    Back-compat: if the old `subject`/`body`/`followup_subject`/
+    `followup_body` keys are present (and `steps` is missing), they're
+    auto-promoted into a 1-2 element `steps` list before rendering.
     """
     wb = load_workbook(io.BytesIO(original_bytes), data_only=False)
     ws = wb[sheet_name] if sheet_name else wb.active
     if ws is None:
         raise ValueError("No sheet to write to")
 
+    # Normalize back-compat shape → `steps` list everywhere.
+    for res in results_by_row.values():
+        if "steps" in res:
+            continue
+        steps: list[dict[str, str]] = []
+        if res.get("subject") or res.get("body"):
+            steps.append({"subject": res.get("subject", ""), "body": res.get("body", "")})
+        if res.get("followup_subject") or res.get("followup_body"):
+            steps.append({"subject": res.get("followup_subject", ""), "body": res.get("followup_body", "")})
+        res["steps"] = steps
+
+    max_steps = max(
+        (len(r.get("steps") or []) for r in results_by_row.values()),
+        default=1,
+    )
+    if max_steps == 0:
+        max_steps = 1
+
+    step_cols = _step_columns(max_steps)
+    appended_columns = (*step_cols, *TRAILING_COLUMNS)
     first_new_col = ws.max_column + 1
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="6D08BE", end_color="6D08BE", fill_type="solid")  # LakeB2B purple
     header_align = Alignment(horizontal="left", vertical="center")
 
-    for offset, col_label in enumerate(APPENDED_COLUMNS):
+    for offset, col_label in enumerate(appended_columns):
         col = first_new_col + offset
         c = ws.cell(row=1, column=col, value=col_label)
         c.font = header_font
         c.fill = header_fill
         c.alignment = header_align
-        ws.column_dimensions[get_column_letter(col)].width = 32 if "Body" in col_label else 22
+        ws.column_dimensions[get_column_letter(col)].width = (
+            32 if "Body" in col_label or col_label == "LinkedIn DM" else 22
+        )
 
     for row_idx, res in results_by_row.items():
         if row_idx < 2:
             continue
-        values = [
-            res.get("subject", ""),
-            res.get("body", ""),
-            res.get("followup_subject", ""),
-            res.get("followup_body", ""),
+        steps = res.get("steps") or []
+        values: list[Any] = []
+        for step_idx in range(max_steps):
+            step = steps[step_idx] if step_idx < len(steps) else {}
+            values.extend([step.get("subject", ""), step.get("body", "")])
+        values.extend([
             res.get("linkedin", ""),
             res.get("model", ""),
             res.get("slot", ""),
             res.get("deliverability", ""),
             res.get("reply_likelihood", ""),
             ", ".join(res.get("warnings") or []),
-        ]
+        ])
         for offset, value in enumerate(values):
             cell = ws.cell(row=row_idx, column=first_new_col + offset, value=value)
-            col_name = APPENDED_COLUMNS[offset]
+            col_name = appended_columns[offset]
             if "Body" in col_name or col_name == "LinkedIn DM":
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 

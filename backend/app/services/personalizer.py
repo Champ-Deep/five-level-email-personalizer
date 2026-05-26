@@ -26,7 +26,7 @@ from app.levels.schemas import (
 from app.services.brand_service import BrandConfig
 from app.services.llm.base import LLMError, LLMProvider
 from app.services.llm.openrouter import extract_json
-from app.levels.followup_prompts import followup_prompt
+from app.levels.followup_prompts import followup_prompt, sequence_step_prompt
 from app.levels.linkedin_prompts import linkedin_prompt
 from app.services.research_service import research_prospect
 from app.services.scores import score_email
@@ -277,13 +277,24 @@ async def personalize(
             draft.scores = score_email(draft, brief)
         variations.append(Variation(slot=spec.slot, label=spec.label or spec.model, model=spec.model, email=draft))
 
-    # Optional follow-up generation: one extra LLM call per successful variation,
-    # using the same model the initial used. Runs in parallel across variations.
-    if request.include_followup and variations:
-        async def _gen_followup(v: Variation) -> tuple[str, EmailDraft | None]:
-            if v.email.subject.startswith("[") or not v.email.body:
-                return v.slot, None
-            prompt = followup_prompt(brief, sender, v.email)
+    # Resolve effective sequence length. `include_followup=true` from
+    # older callers is honored as sequence_length>=2 so nothing breaks.
+    effective_sequence_length = max(
+        request.sequence_length,
+        2 if request.include_followup else 1,
+    )
+
+    # Generate follow-up steps 2..N. Across variations we fan out in
+    # parallel; *within* a variation each step needs the previous one's
+    # content (different-angle prompting), so the steps run sequentially
+    # per variation.
+    if effective_sequence_length >= 2 and variations:
+        async def _gen_step(
+            v: Variation, step: int, prior_emails: list[EmailDraft]
+        ) -> EmailDraft:
+            prompt = sequence_step_prompt(
+                step=step, brief=brief, sender=sender, prior_emails=prior_emails
+            )
             try:
                 async with semaphore:
                     raw = await provider.chat(
@@ -294,28 +305,43 @@ async def personalize(
                         system=system_prompt(brand.system_prompt_addendum, composed_style_rules),
                     )
                 data = _normalize_email_keys(extract_json(raw))
-                f_draft = EmailDraft(
+                draft = EmailDraft(
                     subject=str(data.get("subject", "")).strip(),
                     body=str(data.get("body", "")).strip(),
                     word_count=int(data.get("word_count") or _count_words(data.get("body", ""))),
                     anchor_signal=str(data.get("anchor_signal", "")).strip(),
                 )
-                f_warnings = _validate(f_draft)
-                if f_warnings:
-                    f_draft.warnings = f_warnings
-                f_draft.scores = score_email(f_draft, brief)
-                return v.slot, f_draft
+                warnings = _validate(draft)
+                if warnings:
+                    draft.warnings = warnings
+                draft.scores = score_email(draft, brief)
+                return draft
             except Exception as e:
-                return v.slot, EmailDraft(
-                    subject=f"[Follow-up {v.slot} failed]",
+                return EmailDraft(
+                    subject=f"[Step {step} ({v.slot}) failed]",
                     body=str(e), word_count=0, anchor_signal="",
-                    warnings=[f"followup_error: {type(e).__name__}"],
+                    warnings=[f"sequence_step_{step}_error: {type(e).__name__}"],
                 )
 
-        followups = await asyncio.gather(*[_gen_followup(v) for v in variations], return_exceptions=False)
-        followup_by_slot = {slot: draft for slot, draft in followups}
+        async def _gen_chain(v: Variation) -> tuple[str, list[EmailDraft]]:
+            if v.email.subject.startswith("[") or not v.email.body:
+                return v.slot, []
+            chain: list[EmailDraft] = []
+            prior = [v.email]
+            for step in range(2, effective_sequence_length + 1):
+                draft = await _gen_step(v, step, prior)
+                chain.append(draft)
+                # Only feed *successful* drafts into the next step's
+                # context — a "[Step N failed]" placeholder shouldn't
+                # confuse the model writing step N+1.
+                if not draft.subject.startswith("["):
+                    prior = prior + [draft]
+            return v.slot, chain
+
+        chains = await asyncio.gather(*[_gen_chain(v) for v in variations], return_exceptions=False)
+        chain_by_slot = {slot: chain for slot, chain in chains}
         for v in variations:
-            v.followup = followup_by_slot.get(v.slot)
+            v.sequence = chain_by_slot.get(v.slot, [])
 
     # Optional LinkedIn DM: same model as the variation. Runs in
     # parallel across variations under the same semaphore so we don't
@@ -393,6 +419,7 @@ async def personalize_one(
     style_rules: Optional[str] = None,
     tone_preset: Optional[str] = None,
     include_followup: bool = False,
+    sequence_length: int = 1,
     include_linkedin: bool = False,
     variations: Optional[list] = None,
 ) -> PersonalizeResponse:
@@ -407,6 +434,7 @@ async def personalize_one(
         style_rules=style_rules,
         tone_preset=tone_preset,
         include_followup=include_followup,
+        sequence_length=sequence_length,
         include_linkedin=include_linkedin,
         variations=variations,
     )

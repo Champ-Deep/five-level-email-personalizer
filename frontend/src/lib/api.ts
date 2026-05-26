@@ -152,6 +152,11 @@ export interface Variation {
   label: string;
   model: string;
   email: EmailDraft;
+  /** Follow-up chain (in order). Length = sequence_length - 1 on the
+   *  request. Empty when the user picked sequence_length=1. */
+  sequence?: EmailDraft[];
+  /** Back-compat shim — equals sequence[0] when present. Older clients
+   *  read this directly; new code should read sequence instead. */
   followup?: EmailDraft | null;
   linkedin?: LinkedInDraft | null;
 }
@@ -174,6 +179,8 @@ export interface PersonalizeBody {
   style_rules?: string | null;
   tone_preset?: string | null;
   include_followup?: boolean;
+  /** 1..5. 1 = initial only, 2 = + 1 follow-up, …, 5 = + 4 follow-ups. */
+  sequence_length?: number;
   include_linkedin?: boolean;
 }
 
@@ -380,7 +387,7 @@ export const api = {
       auth: false,
     }),
 
-  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup?: boolean }, brand: string) =>
+  batch: (body: PersonalizeBody & { prospects: PersonalizeBody["prospect"][]; include_followup?: boolean; sequence_length?: number }, brand: string) =>
     request<{ job_id: string }>(`/v1/personalize/batch`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -390,14 +397,17 @@ export const api = {
   batchExcel: async (
     file: File,
     sender: { name: string; company: string; offer: string },
-    opts: { brand: string; include_followup?: boolean; include_linkedin?: boolean; tone_preset?: string; style_rules?: string },
-  ): Promise<{ job_id: string; total: number; include_followup: boolean }> => {
+    opts: { brand: string; include_followup?: boolean; sequence_length?: number; include_linkedin?: boolean; tone_preset?: string; style_rules?: string },
+  ): Promise<{ job_id: string; total: number; include_followup: boolean; sequence_length: number }> => {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("sender_name", sender.name);
     fd.append("sender_company", sender.company);
     fd.append("sender_offer", sender.offer);
     if (opts.include_followup) fd.append("include_followup", "true");
+    if (opts.sequence_length && opts.sequence_length > 1) {
+      fd.append("sequence_length", String(opts.sequence_length));
+    }
     if (opts.include_linkedin) fd.append("include_linkedin", "true");
     if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
     if (opts.style_rules) fd.append("style_rules", opts.style_rules);
@@ -413,7 +423,12 @@ export const api = {
       throw new Error(msg);
     }
     const j = await res.json();
-    return { job_id: j.job_id, total: Number(j.total || 0), include_followup: j.include_followup === "True" };
+    return {
+      job_id: j.job_id,
+      total: Number(j.total || 0),
+      include_followup: j.include_followup === "True",
+      sequence_length: Number(j.sequence_length || 1),
+    };
   },
   getJob: (jobId: string) =>
     request<{
@@ -575,7 +590,7 @@ export const api = {
 
   // Per-row regenerate (A3)
   regenerateRow: (jobId: string, index: number, opts: {
-    tone_preset?: string; style_rules?: string; include_followup?: boolean; include_linkedin?: boolean; model?: string
+    tone_preset?: string; style_rules?: string; include_followup?: boolean; sequence_length?: number; include_linkedin?: boolean; model?: string
   } = {}) =>
     request<PersonalizeResponse>(`/v1/jobs/${jobId}/regenerate/${index}`, {
       method: "POST", body: JSON.stringify(opts),

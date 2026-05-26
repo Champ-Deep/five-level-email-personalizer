@@ -292,6 +292,7 @@ async def personalize_excel(
     sender_company: str = Form(...),
     sender_offer: str = Form(...),
     include_followup: bool = Form(False),
+    sequence_length: int = Form(1),
     include_linkedin: bool = Form(False),
     tone_preset: Optional[str] = Form(None),
     style_rules: Optional[str] = Form(None),
@@ -337,6 +338,7 @@ async def personalize_excel(
         sender=_SI(name=sender_name, company=sender_company, offer=sender_offer),
         levels=[5],
         include_followup=include_followup,
+        sequence_length=sequence_length,
         include_linkedin=include_linkedin,
         tone_preset=tone_preset,
         style_rules=style_rules,
@@ -403,5 +405,6 @@ async def personalize_excel(
         "job_id": str(job.id),
         "total": str(job.total),
         "include_followup": str(include_followup),
+        "sequence_length": str(sequence_length),
         "include_linkedin": str(include_linkedin),
     }
