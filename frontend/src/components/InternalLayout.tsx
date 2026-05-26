@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api, getToken, setToken, type BrandConfig, type UserMe } from "@/lib/api";
+import { Link, useLocation } from "react-router-dom";
+import { UserButton, useUser } from "@clerk/clerk-react";
+import { api, type BrandConfig } from "@/lib/api";
 import { applyBrandTokens } from "@/lib/brandTokens";
 
 const NAV: Array<{ to: string; label: string }> = [
@@ -27,30 +28,20 @@ interface Props {
 }
 
 export function InternalLayout({ title, subtitle, children, actions }: Props) {
-  const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useUser();
   const [brand, setBrand] = useState<BrandConfig | null>(null);
-  const [me, setMe] = useState<UserMe | null>(null);
 
   useEffect(() => {
-    if (!getToken()) { navigate("/login"); return; }
     let cancelled = false;
-    Promise.all([
-      api.listBrands().then(slugs => slugs[0] ? api.getBrand(slugs[0]) : null),
-      api.me().catch(() => null),
-    ]).then(([b, u]) => {
-      if (cancelled) return;
-      if (b) { setBrand(b); applyBrandTokens(b); }
-      setMe(u);
-    });
+    api.listBrands()
+      .then(slugs => slugs[0] ? api.getBrand(slugs[0]) : null)
+      .then(b => {
+        if (cancelled) return;
+        if (b) { setBrand(b); applyBrandTokens(b); }
+      });
     return () => { cancelled = true; };
-  }, [navigate]);
-
-  const signOut = async () => {
-    try { await api.logout(); } catch { /* ignore */ }
-    setToken(null);
-    navigate("/login");
-  };
+  }, []);
 
   if (!brand) return <div className="p-10 text-sm">Loading…</div>;
 
@@ -74,18 +65,12 @@ export function InternalLayout({ title, subtitle, children, actions }: Props) {
           </Link>
           <span className="text-xs" style={{ color: "var(--brand-muted)" }}>Internal</span>
           <span className="flex-1" />
-          {me && (
+          {user?.primaryEmailAddress?.emailAddress && (
             <span className="text-xs" style={{ color: "var(--brand-muted)" }}>
-              {me.email}
+              {user.primaryEmailAddress.emailAddress}
             </span>
           )}
-          <button
-            onClick={signOut}
-            className="text-xs"
-            style={{ color: "var(--brand-muted)" }}
-          >
-            Sign out
-          </button>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 

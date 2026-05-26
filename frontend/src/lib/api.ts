@@ -6,14 +6,38 @@ const API_BASE: string = (
   (import.meta as any).env?.VITE_API_BASE_URL ?? ""
 ).replace(/\/$/, "");
 
-const TOKEN_KEY = "champ-personalize:token";
+// Lead-magnet token cache (the public lead-magnet page captures an
+// email → server hands back a short-lived HMAC token that bumps the
+// rate limit). User auth is Clerk-only and never touches localStorage.
+const LEAD_TOKEN_KEY = "champ-personalize:lead-token";
 
-export function getToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+export function getLeadToken(): string | null {
+  try { return localStorage.getItem(LEAD_TOKEN_KEY); } catch { return null; }
 }
-export function setToken(t: string | null) {
-  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {}
+export function setLeadToken(t: string | null) {
+  try { t ? localStorage.setItem(LEAD_TOKEN_KEY, t) : localStorage.removeItem(LEAD_TOKEN_KEY); } catch {}
 }
+
+// Clerk session-token fetcher. The Clerk SDK is React-only so we can't
+// call useAuth() outside a component; instead a top-level <AuthSync/>
+// registers `getToken` here so any module can await a fresh token. When
+// the user is signed out the fetcher returns null and we fall back to
+// the lead token (or no auth at all).
+let _clerkTokenGetter: (() => Promise<string | null>) | null = null;
+export function setClerkTokenGetter(fn: (() => Promise<string | null>) | null) {
+  _clerkTokenGetter = fn;
+}
+export async function getAuthToken(): Promise<string | null> {
+  if (_clerkTokenGetter) {
+    try { return (await _clerkTokenGetter()) ?? getLeadToken(); } catch { /* fall through */ }
+  }
+  return getLeadToken();
+}
+
+// Back-compat aliases. Some older callers import { getToken, setToken }
+// — keep them so we don't have to touch 20 files in this PR.
+export const getToken = getLeadToken;
+export const setToken = setLeadToken;
 
 type Body = unknown;
 
@@ -27,11 +51,13 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
-/** Add the auth header (and optional X-Brand) onto an existing headers map. */
-export function authHeaders(extra: Record<string, string> = {}, brand?: string): Record<string, string> {
+/** Add the auth header (and optional X-Brand) onto an existing headers map.
+ *  Async because the Clerk session token is fetched lazily — the SDK
+ *  refreshes it as needed, so we never want a stale cached copy. */
+export async function authHeaders(extra: Record<string, string> = {}, brand?: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...extra };
   if (brand) headers["X-Brand"] = brand;
-  const t = getToken();
+  const t = await getAuthToken();
   if (t) headers["Authorization"] = `Bearer ${t}`;
   return headers;
 }
@@ -43,7 +69,7 @@ async function request<T>(path: string, init: RequestInit & { brand?: string; au
   };
   if (init.brand) headers["X-Brand"] = init.brand;
   if (init.auth !== false) {
-    const t = getToken();
+    const t = await getAuthToken();
     if (t) headers["Authorization"] = `Bearer ${t}`;
   }
   const res = await fetch(apiUrl(path), { ...init, headers });
@@ -376,7 +402,7 @@ export const api = {
     if (opts.tone_preset) fd.append("tone_preset", opts.tone_preset);
     if (opts.style_rules) fd.append("style_rules", opts.style_rules);
     const res = await fetch(apiUrl(`/v1/personalize/excel`), {
-      method: "POST", body: fd, headers: authHeaders({}, opts.brand),
+      method: "POST", body: fd, headers: await authHeaders({}, opts.brand),
     });
     if (!res.ok) {
       let d: unknown;
@@ -408,7 +434,7 @@ export const api = {
     sp.set("format", opts.format || "xlsx");
     sp.set("pick", opts.pick || "auto");
     const res = await fetch(apiUrl(`/v1/jobs/${jobId}/export?${sp.toString()}`), {
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
     const blob = await res.blob();
@@ -495,7 +521,7 @@ export const api = {
     const fd = new FormData();
     fd.append("file", file);
     const res = await fetch(apiUrl(`/v1/suppressions/bulk`), {
-      method: "POST", body: fd, headers: authHeaders(),
+      method: "POST", body: fd, headers: await authHeaders(),
     });
     if (!res.ok) {
       const detail = await res.text();
