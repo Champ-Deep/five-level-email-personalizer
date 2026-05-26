@@ -1,20 +1,33 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { RedirectToSignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 
 import { ApiKeysRoute } from "./routes/ApiKeys";
-import { ForgotPasswordRoute } from "./routes/ForgotPassword";
 import { HistoryRoute } from "./routes/History";
 import { IcpProfilesRoute } from "./routes/IcpProfiles";
 import { IntegrationsRoute } from "./routes/Integrations";
 import { InternalAppRoute } from "./routes/InternalApp";
 import { LeadMagnetRoute } from "./routes/LeadMagnet";
-import { LoginRoute } from "./routes/Login";
 import { RepliesRoute } from "./routes/Replies";
-import { ResetPasswordRoute } from "./routes/ResetPassword";
 import { SendersRoute } from "./routes/Senders";
 import { SettingsRoute } from "./routes/Settings";
-import { SignupRoute } from "./routes/Signup";
 import { SuppressionsRoute } from "./routes/Suppressions";
 import { WebhooksRoute } from "./routes/Webhooks";
+
+/** Wraps a route in Clerk's auth gate. Signed-out visitors are bounced
+ *  to Clerk's hosted sign-in (the Account portal). Sign-in/up live in
+ *  the modal on the header for in-app starts, but a deep link straight
+ *  to a /app/* URL still works because RedirectToSignIn captures the
+ *  current path and returns the user there post-auth. */
+function Protected({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
+}
 
 export default function App() {
   return (
@@ -23,21 +36,23 @@ export default function App() {
       <Route path="/lead-magnet/:brand" element={<LeadMagnetRoute />} />
       <Route path="/lead-magnet" element={<Navigate to="/lead-magnet/lakeb2b" replace />} />
 
-      <Route path="/app" element={<InternalAppRoute />} />
-      <Route path="/app/history" element={<HistoryRoute />} />
-      <Route path="/app/senders" element={<SendersRoute />} />
-      <Route path="/app/icp" element={<IcpProfilesRoute />} />
-      <Route path="/app/suppressions" element={<SuppressionsRoute />} />
-      <Route path="/app/replies" element={<RepliesRoute />} />
-      <Route path="/app/integrations" element={<IntegrationsRoute />} />
-      <Route path="/app/api-keys" element={<ApiKeysRoute />} />
-      <Route path="/app/webhooks" element={<WebhooksRoute />} />
-      <Route path="/app/settings" element={<SettingsRoute />} />
+      <Route path="/app" element={<Protected><InternalAppRoute /></Protected>} />
+      <Route path="/app/history" element={<Protected><HistoryRoute /></Protected>} />
+      <Route path="/app/senders" element={<Protected><SendersRoute /></Protected>} />
+      <Route path="/app/icp" element={<Protected><IcpProfilesRoute /></Protected>} />
+      <Route path="/app/suppressions" element={<Protected><SuppressionsRoute /></Protected>} />
+      <Route path="/app/replies" element={<Protected><RepliesRoute /></Protected>} />
+      <Route path="/app/integrations" element={<Protected><IntegrationsRoute /></Protected>} />
+      <Route path="/app/api-keys" element={<Protected><ApiKeysRoute /></Protected>} />
+      <Route path="/app/webhooks" element={<Protected><WebhooksRoute /></Protected>} />
+      <Route path="/app/settings" element={<Protected><SettingsRoute /></Protected>} />
 
-      <Route path="/login" element={<LoginRoute />} />
-      <Route path="/signup" element={<SignupRoute />} />
-      <Route path="/forgot-password" element={<ForgotPasswordRoute />} />
-      <Route path="/reset-password" element={<ResetPasswordRoute />} />
+      {/* Legacy auth routes — bounce anyone landing on them to Clerk. */}
+      <Route path="/login" element={<RedirectToSignIn />} />
+      <Route path="/signup" element={<RedirectToSignIn />} />
+      <Route path="/forgot-password" element={<RedirectToSignIn />} />
+      <Route path="/reset-password" element={<RedirectToSignIn />} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

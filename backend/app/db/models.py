@@ -24,15 +24,12 @@ class Lead(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
-    name: Mapped[str | None] = mapped_column(String(200))
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), default="user")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+# User model removed in the Clerk migration — Clerk is the user
+# directory. `subj.sub` in TokenSubject is now the Clerk user_id
+# (`user_xxxxxxxx`). Existing `users` rows in dev/prod stay in place
+# (no DROP TABLE) but the model isn't imported anywhere. Run the
+# additive migration to make password_hash nullable so old test fixtures
+# that insert a User don't break.
 
 
 class Job(Base):
@@ -231,20 +228,6 @@ class EvalRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PasswordResetToken(Base):
-    """One-use token mailed to the user for a forgot-password flow.
-
-    We store the SHA-256 hash of the token (not the token itself) so that
-    a leaked database row can't be used to reset somebody's password —
-    the only way in is the email link. `used_at` flips on successful
-    consumption so the same link can't be replayed.
-    """
-
-    __tablename__ = "password_reset_tokens"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+# PasswordResetToken removed in the Clerk migration — Clerk handles its
+# own password-reset emails. The table is left intact in existing
+# databases (no DROP TABLE issued); it just stops being referenced.

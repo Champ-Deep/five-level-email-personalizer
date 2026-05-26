@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, setToken } from "@/lib/api";
+import { api, setLeadToken } from "@/lib/api";
 
 interface Props {
   brand: string;
@@ -21,7 +21,7 @@ export function LeadGate({ brand, brandName, onUnlocked, onClose }: Props) {
     setErr(null);
     try {
       const res = await api.captureLead(email.trim(), brand, name.trim() || undefined);
-      setToken(res.token);
+      setLeadToken(res.token);
       onUnlocked();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));

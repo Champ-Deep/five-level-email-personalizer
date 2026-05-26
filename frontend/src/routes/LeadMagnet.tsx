@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { BriefPanel } from "@/components/BriefPanel";
@@ -7,7 +8,7 @@ import { LayersUsed } from "@/components/LayersUsed";
 import { LeadGate } from "@/components/LeadGate";
 import { PersonalizerForm } from "@/components/PersonalizerForm";
 import { VariationCard } from "@/components/VariationCard";
-import { api, getToken, type BrandConfig, type PersonalizeBody, type PersonalizeResponse } from "@/lib/api";
+import { api, getLeadToken, type BrandConfig, type PersonalizeBody, type PersonalizeResponse } from "@/lib/api";
 import { applyBrandTokens } from "@/lib/brandTokens";
 
 const FUSED_LEVEL = 5;
@@ -33,6 +34,7 @@ export function LeadMagnetRoute() {
   const [err, setErr] = useState<string | null>(null);
   const [gateOpen, setGateOpen] = useState(false);
   const [runsThisSession, setRunsThisSession] = useState(0);
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +45,7 @@ export function LeadMagnetRoute() {
 
       // If the user is signed in and has a default saved sender, prefer that.
       let prefilledFromSaved = false;
-      if (getToken()) {
+      if (isSignedIn) {
         try {
           const list = await api.listSenders();
           if (cancelled) return;
@@ -65,10 +67,12 @@ export function LeadMagnetRoute() {
       }
     }).catch(e => setBrandErr(String(e)));
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, isSignedIn]);
 
-  const hasToken = !!getToken();
-  const canRunMore = hasToken || runsThisSession === 0;
+  // Free runs: 1 anonymous, then either Clerk auth OR a lead-magnet
+  // token unlocks the rest. Signed-in Clerk users skip the gate entirely.
+  const hasUnlock = !!isSignedIn || !!getLeadToken();
+  const canRunMore = hasUnlock || runsThisSession === 0;
 
   const onSubmit = useCallback(async () => {
     if (!brand) return;
@@ -165,7 +169,7 @@ export function LeadMagnetRoute() {
                 ← New prospect
               </button>
               <div className="text-xs" style={{ color: "var(--brand-muted)" }}>
-                {hasToken ? "Unlocked · 20/day" : "Free tier · 1 run used"}
+                {hasUnlock ? "Unlocked · 20/day" : "Free tier · 1 run used"}
               </div>
             </div>
 
@@ -200,7 +204,7 @@ export function LeadMagnetRoute() {
               </div>
             </div>
 
-            {!hasToken && (
+            {!hasUnlock && (
               <div
                 className="mt-2 rounded-xl border px-5 py-5 text-center"
                 style={{ background: "var(--brand-accent-soft)", borderColor: "var(--brand-rule)" }}

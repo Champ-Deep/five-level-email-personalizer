@@ -40,12 +40,24 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # App
-    jwt_secret: str = "change-me"
-    jwt_algorithm: str = "HS256"
-    jwt_lead_ttl_hours: int = 24
-    jwt_user_ttl_hours: int = 24 * 7
     app_base_url: str = "http://localhost:8000"
     frontend_base_url: str = "http://localhost:5173"
+
+    # Clerk — user-facing auth lives in Clerk's hosted dashboard. The backend
+    # only needs to verify Clerk session tokens against the issuer's JWKS.
+    # CLERK_ISSUER is optional but **strongly recommended** in production:
+    # without it any Clerk-signed token from any other app would also verify.
+    # The publishable key is only used to derive the issuer when CLERK_ISSUER
+    # is empty (Clerk encodes it: `pk_test_<base64(domain)>...`).
+    clerk_publishable_key: str = ""
+    clerk_secret_key: str = ""
+    clerk_issuer: str = ""
+
+    # Public lead-magnet tokens (NOT user auth — just a "this IP supplied
+    # an email" signal that bumps the anonymous rate limit). HMAC-signed
+    # with this secret; nothing sensitive lives in them.
+    lead_token_secret: str = "lead-token-dev-secret"
+    lead_token_ttl_hours: int = 24
 
     # Rate limits
     rate_limit_anon_per_day: int = 1
@@ -62,16 +74,13 @@ class Settings(BaseSettings):
     # Personalizer
     max_concurrent_levels: int = Field(default=8, description="asyncio semaphore for OpenRouter fan-out")
 
-    # Transactional email (Resend). When `resend_api_key` is empty the
-    # email service no-ops and the password-reset endpoint logs the link
-    # to stderr instead — handy for local dev without a Resend account.
+    # Transactional email (Resend). Optional in the Clerk world — Clerk
+    # already mails verification + reset emails for us. Resend stays
+    # configured so future transactional flows (e.g. "your batch finished")
+    # have a delivery channel without re-plumbing.
     resend_api_key: str = ""
     resend_base_url: str = "https://api.resend.com"
     resend_from: str = "Champ Personalize <noreply@championsmail.com>"
-    # Length of a password-reset link's validity. 60 min is the sweet
-    # spot — long enough to survive an inbox delay, short enough to
-    # limit blast radius from a forwarded email.
-    password_reset_ttl_minutes: int = 60
 
     @property
     def brands_path(self) -> Path:
