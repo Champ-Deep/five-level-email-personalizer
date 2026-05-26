@@ -117,13 +117,32 @@ export function LeadMagnetRoute() {
       <BrandHeader
         brand={brand}
         rightSlot={
-          <Link
-            to="/app"
-            className="rounded-md border px-3 py-1.5 text-xs font-semibold"
-            style={{ borderColor: "var(--brand-rule)", color: "var(--brand-muted)" }}
-          >
-            Internal app →
-          </Link>
+          isSignedIn ? (
+            <Link
+              to="/app"
+              className="rounded-md border px-3 py-1.5 text-xs font-semibold"
+              style={{ borderColor: "var(--brand-rule)", color: "var(--brand-muted)" }}
+            >
+              Internal app →
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                to="/login"
+                className="text-xs font-semibold"
+                style={{ color: "var(--brand-muted)" }}
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/signup"
+                className="rounded-md px-3 py-1.5 text-xs font-bold"
+                style={{ background: "var(--brand-accent)", color: "var(--brand-bg)" }}
+              >
+                Sign up
+              </Link>
+            </div>
+          )
         }
       />
 

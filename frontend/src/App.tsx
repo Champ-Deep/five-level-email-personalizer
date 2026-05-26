@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { RedirectToSignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { RedirectToSignIn, SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 
 import { ApiKeysRoute } from "./routes/ApiKeys";
 import { HistoryRoute } from "./routes/History";
@@ -47,13 +47,46 @@ export default function App() {
       <Route path="/app/webhooks" element={<Protected><WebhooksRoute /></Protected>} />
       <Route path="/app/settings" element={<Protected><SettingsRoute /></Protected>} />
 
-      {/* Legacy auth routes — bounce anyone landing on them to Clerk. */}
-      <Route path="/login" element={<RedirectToSignIn />} />
-      <Route path="/signup" element={<RedirectToSignIn />} />
-      <Route path="/forgot-password" element={<RedirectToSignIn />} />
-      <Route path="/reset-password" element={<RedirectToSignIn />} />
+      {/* Clerk-mounted auth surfaces. `routing="path"` makes Clerk own
+          the URL — every method enabled in the Clerk dashboard (email,
+          password, Google, magic link, phone, 2FA, etc.) renders here
+          with zero extra code. Path-based instead of modal so the page
+          can carry the brand chrome and survive deep links / refreshes. */}
+      <Route path="/login/*" element={
+        <SignedOut>
+          <ClerkPage>
+            <SignIn routing="path" path="/login" signUpUrl="/signup" fallbackRedirectUrl="/app" />
+          </ClerkPage>
+        </SignedOut>
+      } />
+      <Route path="/signup/*" element={
+        <SignedOut>
+          <ClerkPage>
+            <SignUp routing="path" path="/signup" signInUrl="/login" fallbackRedirectUrl="/app" />
+          </ClerkPage>
+        </SignedOut>
+      } />
+
+      {/* Already-signed-in users hitting /login or /signup bounce into the app. */}
+      <Route path="/login/signed-in" element={<Navigate to="/app" replace />} />
+
+      {/* Legacy reset-password routes — Clerk owns the flow now. */}
+      <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+      <Route path="/reset-password" element={<Navigate to="/login" replace />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  );
+}
+
+/** Centers Clerk's <SignIn>/<SignUp> on the page with brand tokens applied. */
+function ClerkPage({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="grid min-h-screen place-items-center px-4"
+      style={{ background: "var(--brand-bg, #ffffff)" }}
+    >
+      {children}
+    </div>
   );
 }
